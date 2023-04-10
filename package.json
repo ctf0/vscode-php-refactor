@@ -1,0 +1,152 @@
+{
+    "name": "vscode-php-refactor",
+    "displayName": "PHP-Refactor",
+    "version": "0.0.1",
+    "publisher": "ctf0",
+    "icon": "images/icon.png",
+    "engines": {
+        "vscode": "^1.68.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "keywords": [
+        "php",
+        "refactor"
+    ],
+    "activationEvents": [
+        "onLanguage:php"
+    ],
+    "repository": "https://github.com/ctf0/vscode-php-refactor",
+    "main": "./out/main",
+    "contributes": {
+        "submenus": [
+            {
+                "id": "phprefactor.editor.context",
+                "label": "PHP Refactor"
+            }
+        ],
+        "menus": {
+            "commandPalette": [
+                {
+                    "command": "phprefactor.extract_to_function",
+                    "when": "editorLangId == php && editorHasSelection && !editorHasMultipleSelections"
+                },
+                {
+                    "command": "phprefactor.extract_to_property",
+                    "when": "editorLangId == php && editorHasSelection"
+                },
+                {
+                    "command": "phprefactor.add_constructor",
+                    "when": "editorLangId == php && !editorHasSelection"
+                },
+                {
+                    "command": "phprefactor.add_new_property",
+                    "when": "editorLangId == php && !editorHasSelection"
+                },
+                {
+                    "command": "phprefactor.add_phpdoc",
+                    "when": "editorLangId == php && !editorHasSelection"
+                }
+            ],
+            "editor/context": [
+                {
+                    "submenu": "phprefactor.editor.context",
+                    "group": "phprefactor"
+                }
+            ],
+            "phprefactor.editor.context": [
+                {
+                    "command": "phprefactor.extract_to_function",
+                    "when": "editorLangId == php && editorHasSelection && !editorHasMultipleSelections",
+                    "group": "phprefactor"
+                },
+                {
+                    "command": "phprefactor.extract_to_property",
+                    "when": "editorLangId == php && editorHasSelection",
+                    "group": "phprefactor"
+                },
+                {
+                    "command": "phprefactor.add_constructor",
+                    "when": "editorLangId == php && !editorHasSelection"
+                },
+                {
+                    "command": "phprefactor.add_new_property",
+                    "when": "editorLangId == php && !editorHasSelection"
+                }
+            ]
+        },
+        "keybindings": [
+            {
+                "command": "phprefactor.add_phpdoc",
+                "key": "ctrl+enter",
+                "mac": "ctrl+enter",
+                "when": "editorLangId == php && !editorHasSelection"
+            }
+        ],
+        "commands": [
+            {
+                "command": "phprefactor.extract_to_function",
+                "title": "Extract To Method/Function",
+                "category": "PHP Refactor"
+            },
+            {
+                "command": "phprefactor.extract_to_property",
+                "title": "Extract To Property",
+                "category": "PHP Refactor"
+            },
+            {
+                "command": "phprefactor.add_constructor",
+                "title": "Add Constructor",
+                "category": "Php Refactor"
+            },
+            {
+                "command": "phprefactor.add_new_property",
+                "title": "Add New Property",
+                "category": "Php Refactor"
+            },
+            {
+                "command": "phprefactor.add_phpdoc",
+                "title": "Add PhpDoc (alias to 'intelephense.phpdoc.add')",
+                "category": "Php Refactor"
+            }
+        ],
+        "configuration": {
+            "type": "object",
+            "title": "PHP Refactor",
+            "properties": {
+                "phpRefactor.enableCodeActions": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "enable code actions"
+                },
+                "phpRefactor.showReadonly": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "add php 8.1 readonly to property snippet"
+                }
+            }
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run esbuild-base -- --pure:console.log --minify",
+        "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=out/main.js --external:vscode --format=cjs --platform=node",
+        "esbuild": "npm run esbuild-base -- --sourcemap",
+        "esbuild-watch": "npm run esbuild-base -- --sourcemap --watch",
+        "watch": "npm run esbuild"
+    },
+    "devDependencies": {
+        "@types/node": "^18.14.1",
+        "@types/vscode": "^1.68.0",
+        "esbuild": "^0.17.10",
+        "typescript": "^4.9.5"
+    },
+    "dependencies": {
+        "lodash.set": "^4.3.2",
+        "lodash.throttle": "^4.1.1",
+        "php-parser": "^3.1.3"
+    },
+    "extensionDependencies": [
+        "bmewburn.vscode-intelephense-client"
+    ]
+}
