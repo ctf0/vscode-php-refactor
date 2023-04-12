@@ -283,6 +283,7 @@ export default class Resolver {
             }
 
             const isFunction = functionBody.kind == 'function';
+            const isStatic = functionBody.isStatic == true;
 
             let methodBodyLine = document.lineAt(functionBody.loc.start.line - 1);
             const indentation = methodBodyLine.text.substring(0, methodBodyLine.firstNonWhitespaceCharacterIndex);
