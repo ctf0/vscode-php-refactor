@@ -26,8 +26,8 @@ export async function activate(context) {
         vscode.commands.registerCommand(`${utils.PACKAGE_CMND_NAME}.extract_to_function`, async () => await _refactor.extractToFunction()),
         vscode.commands.registerCommand(`${utils.PACKAGE_CMND_NAME}.extract_to_property`, async () => await _refactor.extractToProperty()),
         // missing
-        vscode.commands.registerCommand(`${utils.PACKAGE_CMND_NAME}.add_missing_function`, async () => await _refactor.addMissingFunction()),
-        vscode.commands.registerCommand(`${utils.PACKAGE_CMND_NAME}.add_missing_prop`, async () => await _refactor.addMissingProperty()),
+        vscode.commands.registerCommand(`${utils.PACKAGE_CMND_NAME}.add_missing_function`, async () => await _refactor.addMissingMethod()),
+        vscode.commands.registerCommand(`${utils.PACKAGE_CMND_NAME}.add_missing_prop`, async () => await _refactor.addMethodMissingProperty()),
         // new
         vscode.commands.registerCommand(`${utils.PACKAGE_CMND_NAME}.add_constructor`, async () => await _refactor.addConstructor()),
         vscode.commands.registerCommand(`${utils.PACKAGE_CMND_NAME}.add_new_property`, async () => await _refactor.addNewProperty()),

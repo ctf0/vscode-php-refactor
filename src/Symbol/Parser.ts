@@ -46,7 +46,7 @@ export function getMethods(_classAST: any): any[] | undefined {
     return _classAST?.body.filter((item: any) => item.kind == 'method');
 }
 
-function getFunctions(AST) {
+export function getFunctions(AST) {
     const filterExtra = AST?.children?.filter((item: any) => !new RegExp(/declare|usegroup|expressionstatement|function/).test(item.kind));
 
     return AST?.children
@@ -174,4 +174,8 @@ function flagsToVisibility(flags: number): string {
     }
 
     return type;
+}
+
+export function hasStartOrEndIntersection(symbol, selection): any {
+    return symbol.loc.start.line === selection.start.line || symbol.loc.end.line === selection.end.line;
 }

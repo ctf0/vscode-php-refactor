@@ -18,7 +18,7 @@ export default class CodeAction implements vscode.CodeActionProvider {
         const symbols = this.SYMBOLS;
         const { selections } = editor;
 
-        let commands: any = [];
+        const commands: any = [];
 
         if (symbols) {
             const _classSymbols: vscode.DocumentSymbol[] | undefined = symbolsAndReferences.extractClassSymbols(symbols);
@@ -27,16 +27,16 @@ export default class CodeAction implements vscode.CodeActionProvider {
             if (_classSymbols && !symbolsAndReferences.extractConstructorSymbols(_classSymbols)) {
                 commands.push(
                     {
-                        command: `${utils.PACKAGE_CMND_NAME}.add_constructor`,
-                        title: 'Add Constructor',
+                        command : `${utils.PACKAGE_CMND_NAME}.add_constructor`,
+                        title   : 'Add Constructor',
                     },
                 );
             }
 
             // addNewProperty
             commands.push({
-                command: `${utils.PACKAGE_CMND_NAME}.add_new_property`,
-                title: 'Add New Property',
+                command : `${utils.PACKAGE_CMND_NAME}.add_new_property`,
+                title   : 'Add New Property',
             });
 
             if (range.isEmpty === true) {
@@ -54,9 +54,9 @@ export default class CodeAction implements vscode.CodeActionProvider {
                         if (!_methodsOrFunctions.some((item) => item.name == methodName)) {
                             commands.push(
                                 {
-                                    command: `${utils.PACKAGE_CMND_NAME}.add_missing_function`,
-                                    title: 'Add Missing Method/Function Declaration',
-                                    type: vscode.CodeActionKind.QuickFix
+                                    command : `${utils.PACKAGE_CMND_NAME}.add_missing_function`,
+                                    title   : 'Add Missing Method/Function Declaration',
+                                    type    : vscode.CodeActionKind.QuickFix,
                                 },
                             );
                         }
@@ -72,9 +72,9 @@ export default class CodeAction implements vscode.CodeActionProvider {
                         if (!_props || !_props.some((item) => item.name == `\$${propName}`)) {
                             commands.push(
                                 {
-                                    command: `${utils.PACKAGE_CMND_NAME}.add_missing_prop`,
-                                    title: 'Add Missing Property',
-                                    type: vscode.CodeActionKind.QuickFix
+                                    command : `${utils.PACKAGE_CMND_NAME}.add_missing_prop`,
+                                    title   : 'Add Missing Property',
+                                    type    : vscode.CodeActionKind.QuickFix,
                                 },
                             );
                         }
@@ -83,20 +83,28 @@ export default class CodeAction implements vscode.CodeActionProvider {
             } else {
                 // extract_to_function
                 if (selections.length == 1) {
-                    commands.push({
-                        command: `${utils.PACKAGE_CMND_NAME}.extract_to_function`,
-                        title: 'Extract To Method/Function',
-                        type: vscode.CodeActionKind.RefactorExtract
-                    });
+                    const txt = document.getText(selections[0]).trim();
+
+                    if (!(txt.startsWith('->') || txt.startsWith('::'))) {
+                        commands.push({
+                            command : `${utils.PACKAGE_CMND_NAME}.extract_to_function`,
+                            title   : 'Extract To Method/Function',
+                            type    : vscode.CodeActionKind.RefactorExtract,
+                        });
+                    }
                 }
 
                 // extract_to_property
-                if (!selections.some((item) => document.getText(item).trim().startsWith('return'))) {
+                if (!selections.some((item) => {
+                    const txt = document.getText(item).trim();
+
+                    return txt.startsWith('return') || txt.startsWith('->') || txt.startsWith('::');
+                })) {
                     commands.push(
                         {
-                            command: `${utils.PACKAGE_CMND_NAME}.extract_to_property`,
-                            title: 'Extract To Property',
-                            type: vscode.CodeActionKind.RefactorExtract
+                            command : `${utils.PACKAGE_CMND_NAME}.extract_to_property`,
+                            title   : 'Extract To Property',
+                            type    : vscode.CodeActionKind.RefactorExtract,
                         },
                     );
                 }
