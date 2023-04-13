@@ -176,6 +176,10 @@ function flagsToVisibility(flags: number): string {
     return type;
 }
 
-export function hasStartOrEndIntersection(symbol, selection): any {
+export function hasStartOrEndIntersection(symbol, selection): boolean {
     return symbol.loc.start.line === selection.start.line || symbol.loc.end.line === selection.end.line;
+}
+
+export function hasIntersection(symbol, lineNumber): boolean {
+    return symbol.loc.start.line - 1 <= lineNumber && symbol.loc.end.line - 1 >= lineNumber;
 }

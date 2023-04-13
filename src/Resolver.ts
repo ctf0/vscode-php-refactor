@@ -262,11 +262,11 @@ export default class Resolver {
 
         try {
             const _methodsOrFunctions = parser.getMethodsOrFunctions(editor.document.getText());
-            const functionBody = this.checkForInsideFunction(_methodsOrFunctions, activeLine);
+            const functionBody = this.getIntersectedMethodOrFunction(_methodsOrFunctions, activeLine);
 
             this.checkForStartOrEndIntersection(functionBody, selection);
 
-            const selectionTxt = this.checkForStartWithChar(document, selection);
+            const selectionTxt = this.checkStartWithChar(document, selection);
 
             let methodName: any = await vscode.window.showInputBox({
                 placeHolder: 'function/method name',
@@ -346,11 +346,11 @@ export default class Resolver {
 
         try {
             const _methodsOrFunctions = parser.getMethodsOrFunctions(document.getText());
-            const functionBody = this.checkForInsideFunction(_methodsOrFunctions, activeLine);
+            const functionBody = this.getIntersectedMethodOrFunction(_methodsOrFunctions, activeLine);
 
             this.checkForStartOrEndIntersection(functionBody, selection);
 
-            const selectionTxt = this.checkForStartWithChar(document, selection);
+            const selectionTxt = this.checkStartWithChar(document, selection);
 
             let propertyName: any = await vscode.window.showInputBox({
                 placeHolder: 'property name',
@@ -381,11 +381,24 @@ export default class Resolver {
             });
 
             editor = this.getEditor();
-            const _insertLocation = editor.selection;
+            let _insertLocation = editor.selection;
+            let methodBodyLine;
+            let propertyContent;
+            let indentation;
 
-            const methodBodyLine = document.lineAt(activeLine);
-            const indentation = methodBodyLine.text.substring(0, methodBodyLine.firstNonWhitespaceCharacterIndex);
-            const propertyContent = `\n${indentation}${currentTxt}\n`;
+            if (parser.hasIntersection(functionBody, _insertLocation.active.line)) {
+                methodBodyLine = document.lineAt(activeLine);
+                indentation = methodBodyLine.text.substring(0, methodBodyLine.firstNonWhitespaceCharacterIndex);
+                propertyContent = `${indentation}${currentTxt}`;
+            } else {
+                const _currentMethodStart = functionBody.body.children[0].loc.start;
+                // @ts-ignore
+                _insertLocation = parser.getRangeFromLoc(_currentMethodStart, _currentMethodStart);
+                methodBodyLine = document.lineAt(_currentMethodStart.line - 1);
+                indentation = methodBodyLine.text.substring(0, methodBodyLine.firstNonWhitespaceCharacterIndex);
+                propertyContent = `${currentTxt}\n\n${indentation}`;
+                editor.selection = selection;
+            }
 
             return editor.edit((edit: vscode.TextEditorEdit) => {
                 edit.insert(_insertLocation.end, propertyContent);
@@ -409,7 +422,7 @@ export default class Resolver {
 
         try {
             const _methodsOrFunctions = parser.getMethodsOrFunctions(editor.document.getText());
-            const functionBody = this.checkForInsideFunction(_methodsOrFunctions, activeLine);
+            const functionBody = this.getIntersectedMethodOrFunction(_methodsOrFunctions, activeLine);
 
             const isFunction = functionBody.kind == 'function';
             const isStatic = functionBody.isStatic == true;
@@ -521,7 +534,7 @@ export default class Resolver {
         }
     }
 
-    checkForStartWithChar(document, firstSelection) {
+    checkStartWithChar(document, firstSelection) {
         const selectionTxt = document.getText(firstSelection);
 
         if (selectionTxt.startsWith('->') || selectionTxt.startsWith('::')) {
@@ -531,13 +544,13 @@ export default class Resolver {
         return selectionTxt;
     }
 
-    checkForInsideFunction(_methodsOrFunctions, activeLine) {
-        const insideFunctionBody = _methodsOrFunctions?.find((method) => method.loc.start.line - 1 <= activeLine && method.loc.end.line - 1 >= activeLine);
+    getIntersectedMethodOrFunction(_methodsOrFunctions, activeLine) {
+        const intersectedFunctionBody = _methodsOrFunctions?.find((method) => parser.hasIntersection(method, activeLine));
 
-        if (!insideFunctionBody) {
+        if (!intersectedFunctionBody) {
             throw new Error('only contents of method/function can be extracted');
         }
 
-        return insideFunctionBody;
+        return intersectedFunctionBody;
     }
 }
