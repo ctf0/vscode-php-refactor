@@ -1,25 +1,23 @@
 import * as vscode from 'vscode';
+import updateFileReferences from './FileReferenceUpdate';
 import CodeAction from './Providers/CodeAction';
 import Resolver from './Resolver';
 import * as utils from './utils';
 
 export async function activate(context) {
-    /* Config ------------------------------------------------------------------- */
+    await utils.NsExtensionProviderInit();
     utils.setConfig();
 
     let _refactor = new Resolver(utils.config);
 
     context.subscriptions.push(
+        // config
         vscode.workspace.onDidChangeConfiguration((event) => {
             if (event.affectsConfiguration(utils.PACKAGE_NAME)) {
                 utils.setConfig();
                 _refactor = new Resolver(utils.config);
             }
         }),
-    );
-
-    /* Commands ----------------------------------------------------------------- */
-    context.subscriptions.push(
         // misc
         vscode.commands.registerCommand(`${utils.PACKAGE_CMND_NAME}.add_phpdoc`, async () => await _refactor.addPhpDocs()),
         // extract
@@ -33,6 +31,8 @@ export async function activate(context) {
         vscode.commands.registerCommand(`${utils.PACKAGE_CMND_NAME}.add_new_property`, async () => await _refactor.addNewProperty()),
         // providers
         vscode.languages.registerCodeActionsProvider('php', new CodeAction()),
+        // events
+        vscode.workspace.onDidRenameFiles(async (event: vscode.FileRenameEvent) => await updateFileReferences(event)),
     );
 }
 

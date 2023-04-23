@@ -8,6 +8,10 @@
 - (basic) extract selection to method/property "selection must be inside a method/function"
     - new method/function will be added right after the selection method/function
     - ext use ([intelephense](https://marketplace.visualstudio.com/items?itemName=bmewburn.vscode-intelephense-client)) to collect document symbols & generate php doc block
+- support updating file/s namespace on `move/rename`
+    - glob exclude is populated from both `files.watcherExclude` & `search.exclude`
+    - make sure to run `composer dump-autoload` b4 deploying to update its files
+    - until [Issue #168825](https://github.com/microsoft/vscode/issues/168825) is resolved, we have to use regex for the lookup, if something is missing/incorrect, plz open a ticket.
 
 ## Notes
 

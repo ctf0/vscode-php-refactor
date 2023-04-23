@@ -13,3 +13,7 @@
 ## 0.0.4
 
 - fix `extract to property`
+
+## 0.0.5
+
+- add file rename/move refactoring

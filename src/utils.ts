@@ -1,8 +1,12 @@
+import path from 'node:path';
 import * as vscode from 'vscode';
 
 export const PACKAGE_CMND_NAME = 'phprefactor';
 export const PACKAGE_NAME = 'phpRefactor';
-export let config: any;
+export let config: vscode.WorkspaceConfiguration;
+export let filesExcludeGlob: any;
+export let extExclude: any;
+export let NS_EXTENSION_PROVIDER;
 
 export function showMessage(msg, error = true, items: any = []) {
     return error
@@ -12,4 +16,48 @@ export function showMessage(msg, error = true, items: any = []) {
 
 export function setConfig() {
     config = vscode.workspace.getConfiguration(PACKAGE_NAME);
+
+    const filesConfig = vscode.workspace.getConfiguration('files');
+    const searchConfig = vscode.workspace.getConfiguration('search');
+    filesExcludeGlob = [...new Set([
+        ...Object.keys(filesConfig.watcherExclude),
+        ...Object.keys(searchConfig.exclude),
+    ])];
+
+    extExclude = config.excludeSubExtensions.join('|');
+}
+
+export function getConfig(key) {
+    return config.get(key);
+}
+
+export function getFileNameFromPath(filePath) {
+    return path.parse(filePath).name;
+}
+
+export function getFileExtFromPath(filePath) {
+    return path.parse(filePath).ext;
+}
+
+export function getDirNameFromPath(filePath) {
+    return path.parse(filePath).dir;
+}
+
+export function getFileNamespace(uri?: vscode.Uri) {
+    try {
+        return NS_EXTENSION_PROVIDER.getNamespace(uri);
+    } catch (error) {
+        // console.error(error);
+        return undefined;
+    }
+}
+
+export async function NsExtensionProviderInit() {
+    const nsResolverExtension = vscode.extensions.getExtension('ctf0.php-namespace-resolver');
+
+    if (nsResolverExtension == null) {
+        throw new Error('Depends on \'ctf0.php-namespace-resolver\' extension');
+    }
+
+    NS_EXTENSION_PROVIDER = await nsResolverExtension.activate();
 }
