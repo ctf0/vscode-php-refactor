@@ -151,7 +151,7 @@ async function updateFileTypeContentEverywhere(fileToPath: string, fileFromPath:
                     .replace(new RegExp(`(?<=instanceof )${fromClass}(?!\\w)`, 'g'), toClass) // instanceof
                     .replace(new RegExp(`(?<![\w\$])${fromClass}(?= )`, 'g'), toClass)        // param type
                     .replace(new RegExp(`(?<![\w\$])${fromClass}(?=[[<])`, 'g'), toClass)     // type hint
-                    .replace(new RegExp(`(?<=: )${fromClass}(?!\\w)`, 'g'), toClass);         // return type
+                    .replace(new RegExp(`(?<=\):( )?)${fromClass}(?!\\w)`, 'g'), toClass);    // return type
             }
 
             return input;
