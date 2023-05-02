@@ -364,7 +364,7 @@ export default class Resolver {
             propertyName = `\$${propertyName}`;
 
             const isEndOfStatement = selectionTxt.endsWith(';');
-            const currentTxt = `${propertyName} = ${selectionTxt}${isEndOfStatement ? '' : ';'}`;
+            const currentTxt = `${propertyName} = ${selectionTxt}${isEndOfStatement ? '' : ';\n'}`;
 
             // replace selections
             for (const selection of selections) {
