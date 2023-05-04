@@ -17,3 +17,8 @@
 ## 0.0.5
 
 - add file rename/move refactoring
+
+## 0.0.8
+
+- add code action to add `__invoke`
+- multiple selection extract is now handled correctly

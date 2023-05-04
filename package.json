@@ -1,7 +1,7 @@
 {
     "name": "vscode-php-refactor",
     "displayName": "PHP-Refactor",
-    "version": "0.0.7",
+    "version": "0.0.8",
     "publisher": "ctf0",
     "icon": "images/icon.png",
     "engines": {
@@ -41,6 +41,10 @@
                     "when": "editorLangId == php && !editorHasSelection"
                 },
                 {
+                    "command": "phprefactor.add_invoke",
+                    "when": "editorLangId == php && !editorHasSelection"
+                },
+                {
                     "command": "phprefactor.add_new_property",
                     "when": "editorLangId == php && !editorHasSelection"
                 },
@@ -71,6 +75,10 @@
                     "when": "editorLangId == php && !editorHasSelection"
                 },
                 {
+                    "command": "phprefactor.add_invoke",
+                    "when": "editorLangId == php && !editorHasSelection"
+                },
+                {
                     "command": "phprefactor.add_new_property",
                     "when": "editorLangId == php && !editorHasSelection"
                 }
@@ -98,6 +106,11 @@
             {
                 "command": "phprefactor.add_constructor",
                 "title": "Add Constructor",
+                "category": "Php Refactor"
+            },
+            {
+                "command": "phprefactor.add_invoke",
+                "title": "Add Invoke",
                 "category": "Php Refactor"
             },
             {
@@ -160,12 +173,13 @@
         "typescript": "^5.0.4"
     },
     "dependencies": {
-        "lodash.set": "^4.3.2",
-        "lodash.throttle": "^4.1.1",
-        "php-parser": "^3.1.4",
         "escape-string-regexp": "^5.0.0",
         "fast-glob": "^3.2.12",
         "fs-extra": "^11.1.1",
+        "lodash.set": "^4.3.2",
+        "lodash.sortby": "^4.7.0",
+        "lodash.throttle": "^4.1.1",
+        "php-parser": "^3.1.4",
         "replace-in-file": "^6.3.5"
     },
     "extensionDependencies": [

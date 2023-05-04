@@ -33,6 +33,16 @@ export default class CodeAction implements vscode.CodeActionProvider {
                 );
             }
 
+            // addInvoke
+            if (_classSymbols && !symbolsAndReferences.extractInvokeSymbols(_classSymbols)) {
+                commands.push(
+                    {
+                        command : `${utils.PACKAGE_CMND_NAME}.add_invoke`,
+                        title   : 'Add Invoke',
+                    },
+                );
+            }
+
             // addNewProperty
             commands.push({
                 command : `${utils.PACKAGE_CMND_NAME}.add_new_property`,

@@ -61,3 +61,13 @@ export async function NsExtensionProviderInit() {
 
     NS_EXTENSION_PROVIDER = await nsResolverExtension.activate();
 }
+
+export function sortSelections(selections: vscode.Selection[]): vscode.Selection[] {
+    return selections.sort((a, b) => { // make sure its sorted correctly
+        if (a.start.line > b.start.line && a.start.character > b.start.character) return 1;
+
+        if (b.start.line > a.start.line && b.start.character > a.start.character) return -1;
+
+        return 0;
+    }).reverse();
+}

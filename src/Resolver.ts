@@ -1,3 +1,4 @@
+import sortBy from 'lodash.sortby';
 import * as vscode from 'vscode';
 import * as parser from './Symbol/Parser';
 import * as symbolsAndReferences from './Symbol/SymbolsAndReferences';
@@ -38,7 +39,7 @@ export default class Resolver {
         this.setEditorAndAST();
 
         if (this.CLASS_AST.kind != 'class') {
-            return utils.showMessage('only classes can have constructor');
+            return utils.showMessage('only classes can have __construct');
         }
 
         const editor = this.EDITOR;
@@ -55,6 +56,36 @@ export default class Resolver {
         const snippet = `${isPlainClass ? '' : '\n'}` +
             `${indentation ? '\n' : ''}` +
             `${addIndent}\${1|public,private,protected|} function __construct($2){\n` +
+            `${addIndent}${this.DEFAULT_INDENT}$0;` +
+            `\n${addIndent}}\n`;
+
+        return editor.insertSnippet(
+            new vscode.SnippetString(snippet),
+            new vscode.Position(position.line, position.column),
+        );
+    }
+
+    addInvoke(): Thenable<any> {
+        this.setEditorAndAST();
+
+        if (this.CLASS_AST.kind != 'class') {
+            return utils.showMessage('only classes can have __invoke');
+        }
+
+        const editor = this.EDITOR;
+        const { document } = editor;
+
+        const position = parser.getClassScopeInsertLine(this.CLASS_AST);
+        const isPlainClass = position.column == 0;
+
+        const insertLine = document.lineAt(position.line);
+        const indentation = insertLine.text.substring(0, insertLine.firstNonWhitespaceCharacterIndex);
+
+        const addIndent = indentation ? '' : this.DEFAULT_INDENT;
+
+        const snippet = `${isPlainClass ? '' : '\n'}` +
+            `${indentation ? '\n' : ''}` +
+            `${addIndent}\${1|public,private,protected|} function __invoke($2){\n` +
             `${addIndent}${this.DEFAULT_INDENT}$0;` +
             `\n${addIndent}}\n`;
 
@@ -341,16 +372,17 @@ export default class Resolver {
 
     async extractToProperty() {
         let editor = this.getEditor();
-        const { selections, selection, document } = editor;
-        const activeLine = selection.active.line;
+        const { selections, document } = editor;
+        const topSelection = sortBy(selections, (selection) => selection.active.line)[0];
+        const activeLine = topSelection.active.line;
 
         try {
             const _methodsOrFunctions = parser.getMethodsOrFunctions(document.getText());
             const functionBody = this.getIntersectedMethodOrFunction(_methodsOrFunctions, activeLine);
 
-            this.checkForStartOrEndIntersection(functionBody, selection);
+            this.checkForStartOrEndIntersection(functionBody, topSelection);
 
-            const selectionTxt = this.checkStartWithChar(document, selection);
+            const selectionTxt = this.checkStartWithChar(document, topSelection);
 
             let propertyName: any = await vscode.window.showInputBox({
                 placeHolder: 'property name',
@@ -364,16 +396,16 @@ export default class Resolver {
             propertyName = `\$${propertyName}`;
 
             const isEndOfStatement = selectionTxt.endsWith(';');
-            const currentTxt = `${propertyName} = ${selectionTxt}${isEndOfStatement ? '' : ';\n'}`;
+            const extractionTxt = `${propertyName} = ${selectionTxt}${isEndOfStatement ? '' : ';\n'}`;
 
             // replace selections
-            for (const selection of selections) {
+            for (const selection of utils.sortSelections(selections)) {
                 await editor.edit((edit: vscode.TextEditorEdit) => {
                     edit.replace(selection, `${propertyName}${isEndOfStatement ? ';' : ''}`);
                 }, { undoStopBefore: false, undoStopAfter: false });
             }
 
-            editor.selection = selection;
+            editor.selection = topSelection;
 
             // add property
             await vscode.commands.executeCommand('cursorMove', {
@@ -382,22 +414,24 @@ export default class Resolver {
 
             editor = this.getEditor();
             let _insertLocation = editor.selection;
+            const _insertLocationLine = _insertLocation.active.line;
+
             let methodBodyLine;
             let propertyContent;
             let indentation;
 
-            if (parser.hasIntersection(functionBody, _insertLocation.active.line)) {
-                methodBodyLine = document.lineAt(activeLine);
+            if (parser.hasIntersection(functionBody, _insertLocationLine)) {
+                methodBodyLine = document.lineAt(_insertLocationLine + 1);
                 indentation = methodBodyLine.text.substring(0, methodBodyLine.firstNonWhitespaceCharacterIndex);
-                propertyContent = `${indentation}${currentTxt}`;
+                propertyContent = `${indentation}${extractionTxt}`;
             } else {
                 const _currentMethodStart = functionBody.body.children[0].loc.start;
                 // @ts-ignore
                 _insertLocation = parser.getRangeFromLoc(_currentMethodStart, _currentMethodStart);
                 methodBodyLine = document.lineAt(_currentMethodStart.line - 1);
                 indentation = methodBodyLine.text.substring(0, methodBodyLine.firstNonWhitespaceCharacterIndex);
-                propertyContent = `${currentTxt}\n\n${indentation}`;
-                editor.selection = selection;
+                propertyContent = `${extractionTxt}\n\n${indentation}`;
+                editor.selection = topSelection;
             }
 
             return editor.edit((edit: vscode.TextEditorEdit) => {

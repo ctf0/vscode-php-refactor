@@ -18,6 +18,10 @@ export function extractConstructorSymbols(_classSymbols: vscode.DocumentSymbol[]
     return _classSymbols.find((symbol: vscode.DocumentSymbol) => symbol.kind === vscode.SymbolKind.Constructor);
 }
 
+export function extractInvokeSymbols(_classSymbols: vscode.DocumentSymbol[]): vscode.DocumentSymbol | undefined {
+    return _classSymbols.find((symbol: vscode.DocumentSymbol) => symbol.kind === vscode.SymbolKind.Method && symbol.name === '__invoke');
+}
+
 export function extractPropSymbols(_classSymbols: vscode.DocumentSymbol[] | undefined): vscode.DocumentSymbol[] | undefined {
     return _classSymbols?.filter((item) => item.kind === vscode.SymbolKind.Property);
 }
