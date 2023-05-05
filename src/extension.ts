@@ -27,8 +27,7 @@ export async function activate(context) {
         vscode.commands.registerCommand(`${utils.PACKAGE_CMND_NAME}.add_missing_function`, async () => await _refactor.addMissingMethod()),
         vscode.commands.registerCommand(`${utils.PACKAGE_CMND_NAME}.add_missing_prop`, async () => await _refactor.addMethodMissingProperty()),
         // new
-        vscode.commands.registerCommand(`${utils.PACKAGE_CMND_NAME}.add_constructor`, async () => await _refactor.addConstructor()),
-        vscode.commands.registerCommand(`${utils.PACKAGE_CMND_NAME}.add_invoke`, async () => await _refactor.addInvoke()),
+        vscode.commands.registerCommand(`${utils.PACKAGE_CMND_NAME}.add_magic`, async (args) => await _refactor.addMagicMethod(args)),
         vscode.commands.registerCommand(`${utils.PACKAGE_CMND_NAME}.add_new_property`, async () => await _refactor.addNewProperty()),
         // providers
         vscode.languages.registerCodeActionsProvider('php', new CodeAction()),

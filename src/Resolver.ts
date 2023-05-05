@@ -34,11 +34,11 @@ export default class Resolver {
     }
 
     /* New ---------------------------------------------------------------------- */
-    addConstructor(): Thenable<any> {
+    addMagicMethod(methodName): Thenable<any> {
         this.setEditorAndAST();
 
         if (this.CLASS_AST.kind != 'class') {
-            return utils.showMessage('only classes can have __construct');
+            return utils.showMessage(`only classes can have ${methodName}`);
         }
 
         const editor = this.EDITOR;
@@ -53,40 +53,9 @@ export default class Resolver {
         const addIndent = indentation ? '' : this.DEFAULT_INDENT;
 
         const snippet = `${isPlainClass ? '' : '\n'}` +
-            `${indentation ? '\n' : ''}` +
-            `${addIndent}\${1|public,private,protected|} function __construct($2){\n` +
-            `${addIndent}${this.DEFAULT_INDENT}$0;` +
-            `\n${addIndent}}\n`;
-
-        return editor.insertSnippet(
-            new vscode.SnippetString(snippet),
-            new vscode.Position(position.line, position.column),
-        );
-    }
-
-    addInvoke(): Thenable<any> {
-        this.setEditorAndAST();
-
-        if (this.CLASS_AST.kind != 'class') {
-            return utils.showMessage('only classes can have __invoke');
-        }
-
-        const editor = this.EDITOR;
-        const { document } = editor;
-
-        const position = parser.getClassScopeInsertLine(this.CLASS_AST);
-        const isPlainClass = position.column == 0;
-
-        const insertLine = document.lineAt(position.line);
-        const indentation = insertLine.text.substring(0, insertLine.firstNonWhitespaceCharacterIndex);
-
-        const addIndent = indentation ? '' : this.DEFAULT_INDENT;
-
-        const snippet = `${isPlainClass ? '' : '\n'}` +
-            `${indentation ? '\n' : ''}` +
-            `${addIndent}\${1|public,private,protected|} function __invoke($2){\n` +
-            `${addIndent}${this.DEFAULT_INDENT}$0;` +
-            `\n${addIndent}}\n`;
+            `${addIndent}\${1|public,private,protected|} function ${methodName}($2){\n` +
+            `${addIndent}${this.DEFAULT_INDENT}$0;\n` +
+            `${addIndent}}\n\n`;
 
         return editor.insertSnippet(
             new vscode.SnippetString(snippet),

@@ -1,7 +1,7 @@
 {
     "name": "vscode-php-refactor",
     "displayName": "PHP-Refactor",
-    "version": "0.0.9",
+    "version": "0.1.0",
     "publisher": "ctf0",
     "icon": "images/icon.png",
     "engines": {
@@ -37,14 +37,6 @@
                     "when": "editorLangId == php && editorHasSelection"
                 },
                 {
-                    "command": "phprefactor.add_constructor",
-                    "when": "editorLangId == php && !editorHasSelection"
-                },
-                {
-                    "command": "phprefactor.add_invoke",
-                    "when": "editorLangId == php && !editorHasSelection"
-                },
-                {
                     "command": "phprefactor.add_new_property",
                     "when": "editorLangId == php && !editorHasSelection"
                 },
@@ -71,14 +63,6 @@
                     "group": "phprefactor"
                 },
                 {
-                    "command": "phprefactor.add_constructor",
-                    "when": "editorLangId == php && !editorHasSelection"
-                },
-                {
-                    "command": "phprefactor.add_invoke",
-                    "when": "editorLangId == php && !editorHasSelection"
-                },
-                {
                     "command": "phprefactor.add_new_property",
                     "when": "editorLangId == php && !editorHasSelection"
                 }
@@ -102,16 +86,6 @@
                 "command": "phprefactor.extract_to_property",
                 "title": "Extract To Property",
                 "category": "PHP Refactor"
-            },
-            {
-                "command": "phprefactor.add_constructor",
-                "title": "Add Constructor",
-                "category": "Php Refactor"
-            },
-            {
-                "command": "phprefactor.add_invoke",
-                "title": "Add Invoke",
-                "category": "Php Refactor"
             },
             {
                 "command": "phprefactor.add_new_property",
@@ -154,6 +128,20 @@
                     "minItems": 1,
                     "uniqueItems": true,
                     "markdownDescription": "sub php extensions to exclude from reference matching ex.`*.blade.php`"
+                },
+                "phpRefactor.magicMethods": {
+                    "type": "array",
+                    "default": [
+                        "__construct",
+                        "__invoke",
+                        "__toString"
+                    ],
+                    "items": {
+                        "type": "string"
+                    },
+                    "minItems": 1,
+                    "uniqueItems": true,
+                    "markdownDescription": "magic methods list\n`[\n__construct,\n__destruct,\n__call,\n__callStatic,\n__get,\n__set,\n__isset,\n__unset,\n__sleep,\n__wakeup,\n__serialize,\n__unserialize,\n__toString,\n__invoke,\n__set_state,\n__clone,\n__debugInfo\n]`"
                 }
             }
         }

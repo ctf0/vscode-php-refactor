@@ -23,24 +23,17 @@ export default class CodeAction implements vscode.CodeActionProvider {
         if (symbols) {
             const _classSymbols: vscode.DocumentSymbol[] | undefined = symbolsAndReferences.extractClassSymbols(symbols);
 
-            // addConstructor
-            if (_classSymbols && !symbolsAndReferences.extractConstructorSymbols(_classSymbols)) {
-                commands.push(
-                    {
-                        command : `${utils.PACKAGE_CMND_NAME}.add_constructor`,
-                        title   : 'Add Constructor',
-                    },
-                );
-            }
-
-            // addInvoke
-            if (_classSymbols && !symbolsAndReferences.extractInvokeSymbols(_classSymbols)) {
-                commands.push(
-                    {
-                        command : `${utils.PACKAGE_CMND_NAME}.add_invoke`,
-                        title   : 'Add Invoke',
-                    },
-                );
+            // addMagicMethod
+            if (_classSymbols) {
+                for (const methodName of symbolsAndReferences.filterMagicSymbols(_classSymbols, utils.config.magicMethods)) {
+                    commands.push(
+                        {
+                            command   : `${utils.PACKAGE_CMND_NAME}.add_magic`,
+                            title     : `Add ${methodName}`,
+                            arguments : [methodName],
+                        },
+                    );
+                }
             }
 
             // addNewProperty
@@ -126,7 +119,11 @@ export default class CodeAction implements vscode.CodeActionProvider {
 
     private createCommand(cmnd): vscode.CodeAction {
         const action = new vscode.CodeAction(cmnd.title, cmnd.type);
-        action.command = { command: cmnd.command, title: cmnd.title, arguments: cmnd.arguments || [] };
+        action.command = {
+            command   : cmnd.command,
+            title     : cmnd.title,
+            arguments : cmnd.arguments || [],
+        };
 
         return action;
     }

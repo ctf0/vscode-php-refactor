@@ -14,12 +14,12 @@ export function extractClassSymbols(symbols: vscode.DocumentSymbol[]): vscode.Do
     return symbols.find((symbol: vscode.DocumentSymbol) => symbol.kind === vscode.SymbolKind.Class)?.children;
 }
 
-export function extractConstructorSymbols(_classSymbols: vscode.DocumentSymbol[]): vscode.DocumentSymbol | undefined {
-    return _classSymbols.find((symbol: vscode.DocumentSymbol) => symbol.kind === vscode.SymbolKind.Constructor);
-}
+export function filterMagicSymbols(_classSymbols: vscode.DocumentSymbol[], methodNames: string[]): string[] {
+    const current = _classSymbols
+        .filter((symbol: vscode.DocumentSymbol) => symbol.kind === vscode.SymbolKind.Method || symbol.kind === vscode.SymbolKind.Constructor)
+        .map((symbol: vscode.DocumentSymbol) => symbol.name);
 
-export function extractInvokeSymbols(_classSymbols: vscode.DocumentSymbol[]): vscode.DocumentSymbol | undefined {
-    return _classSymbols.find((symbol: vscode.DocumentSymbol) => symbol.kind === vscode.SymbolKind.Method && symbol.name === '__invoke');
+    return methodNames.filter((name) => current.indexOf(name) === -1);
 }
 
 export function extractPropSymbols(_classSymbols: vscode.DocumentSymbol[] | undefined): vscode.DocumentSymbol[] | undefined {

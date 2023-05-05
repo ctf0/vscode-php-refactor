@@ -22,3 +22,8 @@
 
 - add code action to add `__invoke`
 - multiple selection extract is now handled correctly
+
+## 0.1.0
+
+- add code action to add any magic method
+- remove add constructor cmnd

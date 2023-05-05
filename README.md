@@ -4,7 +4,7 @@
     - a constructor and add a property promotion (support inline & multiline)
     - a method and add an argument
     - otherwise it will add the new property to the class scope
-- create a constructor
+- add all magic methods (if not already in the file)
 - (basic) extract selection to method/property "selection must be inside a method/function"
     - new method/function will be added right after the selection method/function
     - ext use ([intelephense](https://marketplace.visualstudio.com/items?itemName=bmewburn.vscode-intelephense-client)) to collect document symbols & generate php doc block
