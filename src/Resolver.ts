@@ -1,4 +1,3 @@
-import sortBy from 'lodash.sortby';
 import * as vscode from 'vscode';
 import * as parser from './Symbol/Parser';
 import * as symbolsAndReferences from './Symbol/SymbolsAndReferences';
@@ -373,7 +372,7 @@ export default class Resolver {
     async extractToProperty() {
         let editor = this.getEditor();
         const { selections, document } = editor;
-        const topSelection = sortBy(selections, (selection) => selection.active.line)[0];
+        const topSelection = utils.sortSelections(selections)[0];
         const activeLine = topSelection.active.line;
 
         try {
@@ -399,7 +398,7 @@ export default class Resolver {
             const extractionTxt = `${propertyName} = ${selectionTxt}${isEndOfStatement ? '' : ';\n'}`;
 
             // replace selections
-            for (const selection of utils.sortSelections(selections)) {
+            for (const selection of utils.sortSelections(selections).reverse()) {
                 await editor.edit((edit: vscode.TextEditorEdit) => {
                     edit.replace(selection, `${propertyName}${isEndOfStatement ? ';' : ''}`);
                 }, { undoStopBefore: false, undoStopAfter: false });

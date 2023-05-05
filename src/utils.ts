@@ -69,5 +69,5 @@ export function sortSelections(selections: vscode.Selection[]): vscode.Selection
         if (b.start.line > a.start.line && b.start.character > a.start.character) return -1;
 
         return 0;
-    }).reverse();
+    });
 }
