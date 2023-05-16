@@ -27,3 +27,7 @@
 
 - add code action to add any magic method
 - remove add constructor cmnd
+
+## 0.1.2
+
+- fix extract to new method outside of class body

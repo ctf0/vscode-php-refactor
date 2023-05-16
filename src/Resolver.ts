@@ -302,6 +302,14 @@ export default class Resolver {
                 `${indentation}${indentation || contentIndentation}${selectionTxt}\n` +
                 `${indentation}}`;
 
+            // add method
+            await editor.edit((edit: vscode.TextEditorEdit) => {
+                edit.insert(
+                    parser.getRangeFromLoc(functionBody.loc.end, functionBody.loc.end).end,
+                    methodContent,
+                );
+            }, { undoStopBefore: false, undoStopAfter: false });
+
             // replace selections
             await editor.edit((edit: vscode.TextEditorEdit) => {
                 const _this = isFunction
@@ -309,14 +317,6 @@ export default class Resolver {
                     : (isStatic ? 'self::' : '$this->');
 
                 edit.replace(selection, `${_this}${methodName}();`);
-            }, { undoStopBefore: false, undoStopAfter: false });
-
-            // add method
-            await editor.edit((edit: vscode.TextEditorEdit) => {
-                edit.insert(
-                    parser.getRangeFromLoc(functionBody.loc.end, functionBody.loc.end).end,
-                    methodContent,
-                );
             }, { undoStopBefore: false, undoStopAfter: false });
 
             return this.addMethodDocs(document, methodName);
