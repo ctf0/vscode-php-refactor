@@ -4,7 +4,8 @@ import * as vscode from 'vscode';
 const _set = require('lodash.set');
 const Parser = new PhpParser.Engine({
     parser: {
-        extractDoc: true,
+        extractDoc     : true,
+        suppressErrors : true,
     },
     ast: {
         withPositions: true,

@@ -26,7 +26,7 @@ export function extractPropSymbols(_classSymbols: vscode.DocumentSymbol[] | unde
     return _classSymbols?.filter((item) => item.kind === vscode.SymbolKind.Property);
 }
 
-export async function getFileSymbols(uri: vscode.Uri): Promise<vscode.DocumentSymbol[] | undefined> {
+export function getFileSymbols(uri: vscode.Uri) {
     return vscode.commands.executeCommand('vscode.executeDocumentSymbolProvider', uri);
 }
 

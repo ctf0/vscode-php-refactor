@@ -31,3 +31,7 @@
 ## 0.1.2
 
 - fix extract to new method outside of class body
+
+## 0.1.3
+
+- allow the extension to work regardless of parsing errors
