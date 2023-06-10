@@ -402,8 +402,14 @@ export default class Resolver {
                 editor.selection = topSelection;
             }
 
-            return editor.edit((edit: vscode.TextEditorEdit) => {
+            return editor.edit(async (edit: vscode.TextEditorEdit) => {
                 edit.insert(_insertLocation.end, propertyContent);
+
+                if (propertyContent.endsWith('\n')) {
+                    await vscode.commands.executeCommand('cursorMove', {
+                        to: 'up',
+                    });
+                }
             }, { undoStopBefore: false, undoStopAfter: false });
         } catch (error) {
             utils.showMessage(error.message);
