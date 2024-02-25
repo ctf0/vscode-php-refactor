@@ -35,3 +35,7 @@
 ## 0.1.3
 
 - allow the extension to work regardless of parsing errors
+
+## 0.1.5
+
+- fix add new property code action

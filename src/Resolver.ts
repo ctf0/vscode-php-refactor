@@ -129,9 +129,9 @@ export default class Resolver {
         const _methods = _methodsOrFunctions.filter((item) => item.kind == 'method');
         const insideMethodBody = _methods?.find((method) => method.loc.start.line - 1 <= activeLine && method.loc.end.line - 1 >= activeLine);
 
-        snippet = '\${1:type} \$\${2:var}\${3: = \${4:\'value\'}}';
-
         if (_methods && insideMethodBody && !insideConstructorBody) {
+            snippet = '\${1:type} \$\${2:var}\${3: = \${4:\'value\'}}';
+
             const args = insideMethodBody?.arguments;
 
             if (args.length) {
@@ -178,6 +178,7 @@ export default class Resolver {
         const insideFunctionBody = _functions?.find((method) => method.loc.start.line - 1 <= activeLine && method.loc.end.line - 1 >= activeLine);
 
         if (_functions && insideFunctionBody) {
+            snippet = '\${1:type} \$\${2:var}\${3: = \${4:\'value\'}}';
             const args = insideFunctionBody?.arguments;
 
             if (args.length) {
@@ -219,23 +220,32 @@ export default class Resolver {
             }
         }
 
-        if (!insideConstructorBody && !insideMethodBody && this.CLASS_AST) {
-            try {
-                position = parser.getClassScopeInsertLine(this.CLASS_AST);
+        if (!insideConstructorBody && !insideMethodBody && !insideFunctionBody) {
+            if (this.CLASS_AST) {
+                try {
+                    position = parser.getClassScopeInsertLine(this.CLASS_AST);
 
-                prefix = position.addPrefixLine ? '\n\n' : '\n';
-                suffix = position.addSuffixLine ? ';\n\n' : ';';
+                    prefix = position.addPrefixLine ? '\n\n' : '\n';
+                    suffix = position.addSuffixLine ? ';\n\n' : ';';
 
-                if (position.column == 0) {
-                    prefix = this.DEFAULT_INDENT;
-                    suffix = position.addSuffixLine ? ';\n' : ';';
+                    if (position.column == 0) {
+                        prefix = this.DEFAULT_INDENT;
+                        suffix = position.addSuffixLine ? ';\n' : ';';
+                    }
+
+                    if (position.column == this.DEFAULT_INDENT.length) {
+                        prefix = '';
+                    }
+                } catch (error) {
+                    // console.error(error);
                 }
-
-                if (position.column == this.DEFAULT_INDENT.length) {
-                    prefix = '';
-                }
-            } catch (error) {
-                // console.error(error);
+            } else {
+                snippet = '\$\${2:var}\${3: = \${4:\'value\'}}';
+                suffix = ';' + (this.getEditor().document.lineAt(activeLine).isEmptyOrWhitespace ? '' : '\n');
+                position = {
+                    line   : selection.active.line,
+                    column : selection.active.character,
+                };
             }
         }
 

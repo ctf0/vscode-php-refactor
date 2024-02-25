@@ -36,13 +36,13 @@ export default class CodeAction implements vscode.CodeActionProvider {
                 }
             }
 
-            // addNewProperty
-            commands.push({
-                command : `${utils.PACKAGE_CMND_NAME}.add_new_property`,
-                title   : 'Add New Property',
-            });
-
             if (range.isEmpty === true) {
+                // addNewProperty
+                commands.push({
+                    command : `${utils.PACKAGE_CMND_NAME}.add_new_property`,
+                    title   : 'Add New Property',
+                });
+
                 const _methodsOrFunctions = symbolsAndReferences.extractMethodOrFunctionsSymbols(symbols);
 
                 if (_methodsOrFunctions && !symbolsAndReferences.hasStartOrEndIntersection(selections, _methodsOrFunctions)) {
