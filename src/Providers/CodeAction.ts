@@ -89,11 +89,18 @@ export default class CodeAction implements vscode.CodeActionProvider {
                     const txt = document.getText(selections[0]).trim();
 
                     if (!(txt.startsWith('->') || txt.startsWith('::'))) {
-                        commands.push({
-                            command : `${utils.PACKAGE_CMND_NAME}.extract_to_function`,
-                            title   : 'Extract To Method/Function',
-                            type    : vscode.CodeActionKind.RefactorExtract,
-                        });
+                        commands.push(
+                            {
+                                command : `${utils.PACKAGE_CMND_NAME}.extract_to_function`,
+                                title   : 'Extract To Method/Function',
+                                type    : vscode.CodeActionKind.RefactorRewrite,
+                            },
+                            {
+                                command : `${utils.PACKAGE_CMND_NAME}.copy_to_function`,
+                                title   : 'Copy To Method/Function',
+                                type    : vscode.CodeActionKind.RefactorExtract,
+                            },
+                        );
                     }
                 }
 
@@ -107,7 +114,7 @@ export default class CodeAction implements vscode.CodeActionProvider {
                         {
                             command : `${utils.PACKAGE_CMND_NAME}.extract_to_property`,
                             title   : 'Extract To Property',
-                            type    : vscode.CodeActionKind.RefactorExtract,
+                            type    : vscode.CodeActionKind.RefactorRewrite,
                         },
                     );
                 }

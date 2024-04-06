@@ -22,6 +22,7 @@ export async function activate(context) {
         vscode.commands.registerCommand(`${utils.PACKAGE_CMND_NAME}.add_phpdoc`, async () => await _refactor.addPhpDocs()),
         // extract
         vscode.commands.registerCommand(`${utils.PACKAGE_CMND_NAME}.extract_to_function`, async () => await _refactor.extractToFunction()),
+        vscode.commands.registerCommand(`${utils.PACKAGE_CMND_NAME}.copy_to_function`, async () => await _refactor.copyToFunction()),
         vscode.commands.registerCommand(`${utils.PACKAGE_CMND_NAME}.extract_to_property`, async () => await _refactor.extractToProperty()),
         // missing
         vscode.commands.registerCommand(`${utils.PACKAGE_CMND_NAME}.add_missing_function`, async () => await _refactor.addMissingMethod()),

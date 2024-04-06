@@ -1,7 +1,7 @@
 {
     "name": "vscode-php-refactor",
     "displayName": "PHP-Refactor",
-    "version": "0.1.5",
+    "version": "0.1.6",
     "publisher": "ctf0",
     "icon": "images/icon.png",
     "engines": {
@@ -33,6 +33,10 @@
                     "when": "editorLangId == php && editorHasSelection && !editorHasMultipleSelections"
                 },
                 {
+                    "command": "phprefactor.copy_to_function",
+                    "when": "editorLangId == php && editorHasSelection && !editorHasMultipleSelections"
+                },
+                {
                     "command": "phprefactor.extract_to_property",
                     "when": "editorLangId == php && editorHasSelection"
                 },
@@ -54,6 +58,11 @@
             "phprefactor.editor.context": [
                 {
                     "command": "phprefactor.extract_to_function",
+                    "when": "editorLangId == php && editorHasSelection && !editorHasMultipleSelections",
+                    "group": "phprefactor"
+                },
+                {
+                    "command": "phprefactor.copy_to_function",
                     "when": "editorLangId == php && editorHasSelection && !editorHasMultipleSelections",
                     "group": "phprefactor"
                 },
@@ -80,6 +89,11 @@
             {
                 "command": "phprefactor.extract_to_function",
                 "title": "Extract To Method/Function",
+                "category": "PHP Refactor"
+            },
+            {
+                "command": "phprefactor.copy_to_function",
+                "title": "Copy To Method/Function",
                 "category": "PHP Refactor"
             },
             {

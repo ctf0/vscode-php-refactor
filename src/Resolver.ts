@@ -45,17 +45,15 @@ export default class Resolver {
         const { document } = editor;
 
         const position = parser.getClassScopeInsertLine(this.CLASS_AST);
-        const isPlainClass = position.column == 0;
-
         const insertLine = document.lineAt(position.line);
         const indentation = insertLine.text.substring(0, insertLine.firstNonWhitespaceCharacterIndex);
 
         const addIndent = indentation ? '' : this.DEFAULT_INDENT;
 
-        const snippet = `${isPlainClass ? '' : '\n'}` +
+        const snippet = `${position.addPrefixLine ? '\n\n' : ''}` +
             `${addIndent}\${1|public,private,protected|} function ${methodName}($2){\n` +
             `${addIndent}${this.DEFAULT_INDENT}$0;\n` +
-            `${addIndent}}\n\n`;
+            `${addIndent}}\n${position.addSuffixLine ? '\n' : ''}`;
 
         return editor.insertSnippet(
             new vscode.SnippetString(snippet),
@@ -260,7 +258,7 @@ export default class Resolver {
     }
 
     /* Extract ------------------------------------------------------------------ */
-    async extractToFunction() {
+    async extractToFunction(replace = true) {
         const editor = this.getEditor();
         const { selections, selection, document } = editor;
         const activeLine = selection.active.line;
@@ -321,13 +319,15 @@ export default class Resolver {
             }, { undoStopBefore: false, undoStopAfter: false });
 
             // replace selections
-            await editor.edit((edit: vscode.TextEditorEdit) => {
-                const _this = isFunction
-                    ? ''
-                    : (isStatic ? 'self::' : '$this->');
+            if (replace) {
+                await editor.edit((edit: vscode.TextEditorEdit) => {
+                    const _this = isFunction
+                        ? ''
+                        : (isStatic ? 'self::' : '$this->');
 
-                edit.replace(selection, `${_this}${methodName}();`);
-            }, { undoStopBefore: false, undoStopAfter: false });
+                    edit.replace(selection, `${_this}${methodName}();`);
+                }, { undoStopBefore: false, undoStopAfter: false });
+            }
 
             return this.addMethodDocs(document, methodName);
         } catch (error) {
@@ -335,6 +335,10 @@ export default class Resolver {
 
             // console.error(error);
         }
+    }
+
+    async copyToFunction() {
+        await this.extractToFunction(false);
     }
 
     async addMethodDocs(document: vscode.TextDocument, methodName: string): Promise<unknown> {
