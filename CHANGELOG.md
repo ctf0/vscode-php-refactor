@@ -44,3 +44,7 @@
 
 - add new command `Copy To Method/Function`
 - fix insert line for magic methods
+
+## 0.1.7
+
+- now works in trait as well

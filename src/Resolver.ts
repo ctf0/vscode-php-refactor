@@ -71,7 +71,7 @@ export default class Resolver {
         let prefix = '';
         let suffix = '';
         const readOnly = this.config.showReadonly ? ' readonly' : '';
-        let snippet = `\${1|public,private,protected|}${readOnly} \${2:type} \$\${3:name}\${4: = \${5:\'value\'}}`;
+        let snippet = `\${1|public,private,protected|}${readOnly} \${2:type} \$\${3:name}\${4: = \${5:'value'}}`;
 
         const activeLine = selection.active.line;
 
@@ -87,15 +87,13 @@ export default class Resolver {
                 const lastArg = _propPromotions[_propPromotions.length - 1];
 
                 position = {
-                    line   : lastArg.loc.end.line - 1,
-                    column : lastArg.loc.end.column,
+                    line: lastArg.loc.end.line - 1,
+                    column: lastArg.loc.end.column,
                 };
 
                 // args are multiline
-                if (firstArg !== lastArg) {
-                    if (firstArg.loc.end.line !== lastArg.loc.end.line) {
-                        prefix = ',\n';
-                    }
+                if (firstArg !== lastArg && firstArg.loc.end.line !== lastArg.loc.end.line) {
+                    prefix = ',\n';
                 }
 
                 // one arg
@@ -115,8 +113,8 @@ export default class Resolver {
                 position = document.positionAt(_const.loc.start.offset + constLineText.indexOf('(') + 1);
 
                 position = {
-                    line   : position.line,
-                    column : position.character,
+                    line: position.line,
+                    column: position.character,
                 };
             }
         }
@@ -128,7 +126,7 @@ export default class Resolver {
         const insideMethodBody = _methods?.find((method) => method.loc.start.line - 1 <= activeLine && method.loc.end.line - 1 >= activeLine);
 
         if (_methods && insideMethodBody && !insideConstructorBody) {
-            snippet = '\${1:type} \$\${2:var}\${3: = \${4:\'value\'}}';
+            snippet = "\${1:type} \$\${2:var}\${3: = \${4:'value'}}";
 
             const args = insideMethodBody?.arguments;
 
@@ -137,15 +135,13 @@ export default class Resolver {
                 const lastArg = args[args.length - 1];
 
                 position = {
-                    line   : lastArg.loc.end.line - 1,
-                    column : lastArg.loc.end.column,
+                    line: lastArg.loc.end.line - 1,
+                    column: lastArg.loc.end.column,
                 };
 
                 // args are multiline
-                if (firstArg !== lastArg) {
-                    if (firstArg.loc.end.line !== lastArg.loc.end.line) {
-                        prefix = ',\n';
-                    }
+                if (firstArg !== lastArg && firstArg.loc.end.line !== lastArg.loc.end.line) {
+                    prefix = ',\n';
                 }
 
                 // one arg
@@ -165,8 +161,8 @@ export default class Resolver {
                 position = document.positionAt(insideMethodBody.loc.start.offset + constLineText.indexOf('(') + 1);
 
                 position = {
-                    line   : position.line,
-                    column : position.character,
+                    line: position.line,
+                    column: position.character,
                 };
             }
         }
@@ -176,7 +172,7 @@ export default class Resolver {
         const insideFunctionBody = _functions?.find((method) => method.loc.start.line - 1 <= activeLine && method.loc.end.line - 1 >= activeLine);
 
         if (_functions && insideFunctionBody) {
-            snippet = '\${1:type} \$\${2:var}\${3: = \${4:\'value\'}}';
+            snippet = "\${1:type} \$\${2:var}\${3: = \${4:'value'}}";
             const args = insideFunctionBody?.arguments;
 
             if (args.length) {
@@ -184,15 +180,13 @@ export default class Resolver {
                 const lastArg = args[args.length - 1];
 
                 position = {
-                    line   : lastArg.loc.end.line - 1,
-                    column : lastArg.loc.end.column,
+                    line: lastArg.loc.end.line - 1,
+                    column: lastArg.loc.end.column,
                 };
 
                 // args are multiline
-                if (firstArg !== lastArg) {
-                    if (firstArg.loc.end.line !== lastArg.loc.end.line) {
-                        prefix = ',\n';
-                    }
+                if (firstArg !== lastArg && firstArg.loc.end.line !== lastArg.loc.end.line) {
+                    prefix = ',\n';
                 }
 
                 // one arg
@@ -212,8 +206,8 @@ export default class Resolver {
                 position = document.positionAt(insideFunctionBody.loc.start.offset + constLineText.indexOf('(') + 1);
 
                 position = {
-                    line   : position.line,
-                    column : position.character,
+                    line: position.line,
+                    column: position.character,
                 };
             }
         }
@@ -239,10 +233,10 @@ export default class Resolver {
                 }
             } else {
                 snippet = '\$\${2:var}\${3: = \${4:\'value\'}}';
-                suffix = ';' + (this.getEditor().document.lineAt(activeLine).isEmptyOrWhitespace ? '' : '\n');
+                suffix = `;${this.getEditor().document.lineAt(activeLine).isEmptyOrWhitespace ? '' : '\n'}`;
                 position = {
-                    line   : selection.active.line,
-                    column : selection.active.character,
+                    line: selection.active.line,
+                    column: selection.active.character,
                 };
             }
         }
@@ -412,7 +406,7 @@ export default class Resolver {
                 _insertLocation = parser.getRangeFromLoc(_currentMethodStart, _currentMethodStart);
                 methodBodyLine = document.lineAt(_currentMethodStart.line - 1);
                 indentation = methodBodyLine.text.substring(0, methodBodyLine.firstNonWhitespaceCharacterIndex);
-                propertyContent = `${extractionTxt}\n\n${indentation}`;
+                propertyContent = `${extractionTxt}\n${indentation}`;
                 editor.selection = topSelection;
             }
 

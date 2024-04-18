@@ -4,8 +4,8 @@ import * as vscode from 'vscode';
 const _set = require('lodash.set');
 const Parser = new PhpParser.Engine({
     parser: {
-        extractDoc     : true,
-        suppressErrors : true,
+        extractDoc: true,
+        suppressErrors: true,
     },
     ast: {
         withPositions: true,
@@ -63,8 +63,8 @@ export function getConstructor(_classAST: any, getArgsOnly = false) {
     if (getArgsOnly) {
         return _const?.arguments.map((item: PhpParser.Parameter) =>
             Object.assign(item, {
-                leadingComments : _const.leadingComments,
-                visibility      : flagsToVisibility(item.flags),
+                leadingComments: _const.leadingComments,
+                visibility: flagsToVisibility(item.flags),
             }),
         );
     }
@@ -82,10 +82,10 @@ export function getClassScopeInsertLine(_classAST: any) {
         position = _properties[_properties.length - 1];
 
         return {
-            line          : position.loc.end.line - 1,
-            column        : position.loc.end.column,
-            addPrefixLine : true,
-            addSuffixLine : false,
+            line: position.loc.end.line - 1,
+            column: position.loc.end.column,
+            addPrefixLine: true,
+            addSuffixLine: false,
         };
     }
 
@@ -103,10 +103,10 @@ export function getClassScopeInsertLine(_classAST: any) {
         }
 
         return {
-            line          : position.loc.start.line - 1,
-            column        : position.loc.start.column,
-            addPrefixLine : false,
-            addSuffixLine : true,
+            line: position.loc.start.line - 1,
+            column: position.loc.start.column,
+            addPrefixLine: false,
+            addSuffixLine: true,
         };
     }
 
@@ -115,10 +115,10 @@ export function getClassScopeInsertLine(_classAST: any) {
     position = _classAST;
 
     return {
-        line          : position.loc.end.line - 1,
-        column        : 0,
-        addPrefixLine : false,
-        addSuffixLine : true,
+        line: position.loc.end.line - 1,
+        column: 0,
+        addPrefixLine: false,
+        addSuffixLine: true,
     };
 }
 
@@ -142,7 +142,7 @@ export function getAllProperties(_classAST: any) {
 }
 
 function getClass(AST) {
-    return AST?.children?.find((item: any) => item.kind == 'class');
+    return AST?.children?.find((item: any) => ['class', 'trait'].includes(item.kind));
 }
 
 function getFunctionsLookup(filterExtra) {
