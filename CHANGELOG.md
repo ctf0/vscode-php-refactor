@@ -48,3 +48,10 @@
 ## 0.1.7
 
 - now works in trait as well
+
+## 0.2.0
+
+- fix not working correctly
+- better api
+- change `phpRefactor.excludeSubExtensions` to `phpRefactor.excludeList`, as we dont rely on the search/files exclude anymore
+- update deps

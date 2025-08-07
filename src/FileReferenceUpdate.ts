@@ -1,7 +1,7 @@
 import escapeStringRegexp from 'escape-string-regexp';
 import glob from 'fast-glob';
 import fs from 'fs-extra';
-import replace from 'replace-in-file';
+import { replaceInFile } from 'replace-in-file';
 import * as vscode from 'vscode';
 import * as utils from './utils';
 
@@ -18,7 +18,7 @@ export default async function updateFileReferences(event: vscode.FileRenameEvent
         location    : vscode.ProgressLocation.Notification,
         cancellable : false,
         title       : 'Updating Please Wait',
-    }, async () => {
+    }, async (progress: vscode.Progress<{ message?: string; increment?: number }>) => {
         for (const file of event.files) {
             const from = file.oldUri.fsPath;
             const to = file.newUri.fsPath;
@@ -26,7 +26,7 @@ export default async function updateFileReferences(event: vscode.FileRenameEvent
 
             try {
                 if (_scheme.isDirectory()) {
-                    await replaceFromNamespaceForDirs(to, from);
+                    await replaceFromNamespaceForDirs(to, from, progress);
                 } else {
                     // ignore if not php
                     if (utils.getFileExtFromPath(from) !== EXT || utils.getFileExtFromPath(to) !== EXT) {
@@ -34,27 +34,29 @@ export default async function updateFileReferences(event: vscode.FileRenameEvent
                     }
 
                     // moved to new dir
+                    const _getFileNameAndNamespace = await getFileNameAndNamespace(to, from);
+
                     if (utils.getDirNameFromPath(to) !== utils.getDirNameFromPath(from)) {
-                        const { _from, _to } = await getFileNameAndNamespace(to, from);
+                        const { _from, _to } = _getFileNameAndNamespace;
 
                         if (!_from.namespace || !_to.namespace) {
                             utils.showMessage(ERROR_MSG);
                             continue;
                         }
 
-                        if (await updateFileNamespace(to)) {
-                            await updateOldNSPathEverywhere(to, _to, _from);
+                        if (await updateFileNamespace(to, progress)) {
+                            await updateOldNSPathEverywhere(to, _getFileNameAndNamespace, progress);
                         }
                     }
                     // new file name
                     else {
-                        if (await updateFileTypeNameByFileName(to, from)) {
-                            await updateFileTypeContentEverywhere(to, from);
+                        if (await updateFileTypeNameByFileName(to, _getFileNameAndNamespace, progress)) {
+                            await updateFileTypeContentEverywhere(to, _getFileNameAndNamespace, progress);
                         }
                     }
                 }
             } catch (error) {
-                // console.error(error);
+                console.error(error);
                 break;
             }
         }
@@ -63,22 +65,33 @@ export default async function updateFileReferences(event: vscode.FileRenameEvent
 
 /* Directory ---------------------------------------------------------------- */
 
-async function replaceFromNamespaceForDirs(dirToPath: string, dirFromPath: string) {
-    const checkForPhpFiles = await glob(`**/*!(${utils.extExclude})${EXT}`, { cwd: dirToPath });
+async function replaceFromNamespaceForDirs(
+    dirToPath: string,
+    dirFromPath: string,
+    progress: vscode.Progress<{ message?: string; increment?: number }>
+) {
+    const checkForPhpFiles = await glob(`**/*${EXT}`, {
+        cwd: dirToPath,
+        ignore: utils.filesExcludeGlob
+    });
 
     if (!checkForPhpFiles.length) {
         return;
     }
 
-    return updateEverywhereForDirs(dirToPath, dirFromPath);
+    return updateEverywhereForDirs(dirToPath, dirFromPath, progress);
 }
 
 /* Files Move --------------------------------------------------------------- */
 
-async function updateFileNamespace(fileToPath: string) {
+async function updateFileNamespace(fileToPath: string, progress: vscode.Progress<{ message?: string; increment?: number }>) {
     const toNamespace = await getNamespaceFromPath(fileToPath);
 
-    const results: any = await replace.replaceInFile({
+    progress.report({
+        message: `New File: Updating file namespace to ${toNamespace}`,
+    });
+
+    const results: any = await replaceInFile({
         files     : fileToPath,
         // @ts-ignore
         processor : (input: string) => {
@@ -96,11 +109,18 @@ async function updateFileNamespace(fileToPath: string) {
 
 /* Files Rename ------------------------------------------------------------- */
 
-async function updateFileTypeNameByFileName(fileToPath: string, fileFromPath: string) {
+async function updateFileTypeNameByFileName(
+    fileToPath: string,
+    { _from, _to }: { _from: { name: string; namespace: string; }, _to: { name: string; namespace: string; } },
+    progress: vscode.Progress<{ message?: string; increment?: number }>
+) {
     const TYPES = '^((?:(?:final|abstract) +)?(?:class|interface|enum|trait) +)';
-    const { _from, _to } = await getFileNameAndNamespace(fileToPath, fileFromPath);
 
-    const results: any = await replace.replaceInFile({
+    progress.report({
+        message: `File: Updating file type name from ${_from.name} to ${_to.name}`,
+    });
+
+    const results: any = await replaceInFile({
         files     : fileToPath,
         // @ts-ignore
         processor : (input: string) => {
@@ -118,9 +138,11 @@ async function updateFileTypeNameByFileName(fileToPath: string, fileFromPath: st
     return results[0].hasChanged;
 }
 
-async function updateFileTypeContentEverywhere(fileToPath: string, fileFromPath: string) {
-    const { _from, _to } = await getFileNameAndNamespace(fileToPath, fileFromPath);
-
+async function updateFileTypeContentEverywhere(
+    fileToPath: string,
+    { _to, _from }: { _to: { name: string; namespace: string; }, _from: { name: string; namespace: string; } },
+    progress: vscode.Progress<{ message?: string; increment?: number }>
+) {
     const fromClass = _from.name;
     const toClass = _to.name;
 
@@ -131,19 +153,24 @@ async function updateFileTypeContentEverywhere(fileToPath: string, fileFromPath:
         return;
     }
 
-    await replace.replaceInFile({
-        files     : `${getCWD(fileToPath)}/**/*!(${utils.extExclude})${EXT}`,
-        ignore    : utils.filesExcludeGlob,
+    progress.report({
+        message: `Everywhere: Updating references from ${fromNamespace} to ${toNamespace}`,
+    });
+
+    const escaped = escapeStringRegexp(fromNamespace);
+
+    const results: any = await replaceInFile({
+        files     : await getFilesList(fileToPath),
         // @ts-ignore
         processor : (input: string) => {
             input = input
                 // change the namespace if it has an alias
-                .replace(new RegExp(`(?<=^use )${escapeStringRegexp(fromNamespace)}(?= as)`, 'gm'), toNamespace)
+                .replace(new RegExp(`(?<=^use )${escaped}(?= as)`, 'gm'), toNamespace)
                 // update FQN
-                .replace(new RegExp(`(?<!^use )${escapeStringRegexp(fromNamespace)}(?!\\w)`, 'gm'), toNamespace);
+                .replace(new RegExp(`(?<!^use )${escaped}(?!\\w)`, 'gm'), toNamespace);
 
             // update namespace & reference
-            if (new RegExp(`^use ${escapeStringRegexp(fromNamespace)};`, 'gm').exec(input)) {
+            if (new RegExp(`^use ${escaped};`, 'gm').exec(input)) {
                 input = input
                     .replace(`${fromNamespace};`, `${toNamespace};`)                          // namespace
                     .replace(new RegExp(`(?<=new )${fromClass}(?!\\w)`, 'g'), toClass)        // new()
@@ -151,7 +178,7 @@ async function updateFileTypeContentEverywhere(fileToPath: string, fileFromPath:
                     .replace(new RegExp(`(?<=instanceof )${fromClass}(?!\\w)`, 'g'), toClass) // instanceof
                     .replace(new RegExp(`(?<![\w\$])${fromClass}(?= )`, 'g'), toClass)        // param type
                     .replace(new RegExp(`(?<![\w\$])${fromClass}(?=[[<])`, 'g'), toClass)     // type hint
-                    .replace(new RegExp(`(?<=\):( )?)${fromClass}(?!\\w)`, 'g'), toClass);    // return type
+                    .replace(new RegExp(`(?<=\\):( )?)${fromClass}(?!\\w)`, 'g'), toClass);   // return type
             }
 
             return input;
@@ -166,6 +193,7 @@ async function updateFileTypeContentEverywhere(fileToPath: string, fileFromPath:
 async function updateEverywhereForDirs(
     dirToPath: string,
     dirFromPath: string,
+    progress: vscode.Progress<{ message?: string; increment?: number }>
 ) {
     const fromNamespace = getFQNOnly(await getNamespaceFromPath(dirFromPath + `/ph${EXT}`));
     const toNamespace = getFQNOnly(await getNamespaceFromPath(dirToPath + `/ph${EXT}`));
@@ -184,26 +212,36 @@ async function updateEverywhereForDirs(
         return;
     }
 
-    return replace.replaceInFile({
-        files     : `${getCWD(dirToPath)}/**/*!(${utils.extExclude})${EXT}`,
-        ignore    : utils.filesExcludeGlob,
+    progress.report({
+        message: `Everywhere: Updating references from ${fromNamespace} to ${toNamespace}`,
+    });
+
+    return replaceInFile({
+        files     : await getFilesList(dirToPath),
         // @ts-ignore
         processor : (input: string) => input.replace(new RegExp(escapeStringRegexp(fromNamespace), 'g'), toNamespace),
     });
 }
 
+async function getFilesList(path: string): Promise<string | string[]> {
+    return await glob(`${getCWD(path)}/**/*${EXT}`, { ignore: utils.filesExcludeGlob });
+}
+
 async function updateOldNSPathEverywhere(
     fileToPath: string,
-    _to: { name?: string; namespace: string; },
-    _from: { name?: string; namespace: string; },
+    { _to, _from }: { _to: { name: string; namespace: string; }, _from: { name: string; namespace: string; } },
+    progress: vscode.Progress<{ message?: string; increment?: number }>
 ) {
     const fromNamespace = _from.namespace;
     const toNamespace = _to.namespace;
 
+    progress.report({
+        message: `Old File: Updating references from ${fromNamespace} to ${toNamespace}`,
+    });
+
     // moved from/to namespace
-    return replace.replaceInFile({
-        files     : `${getCWD(fileToPath)}/**/*!(${utils.extExclude})${EXT}`,
-        ignore    : utils.filesExcludeGlob,
+    return replaceInFile({
+        files     : await getFilesList(fileToPath),
         // @ts-ignore
         processor : (input: string) => input.replace(new RegExp(escapeStringRegexp(fromNamespace), 'g'), toNamespace),
     });

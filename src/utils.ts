@@ -5,7 +5,6 @@ export const PACKAGE_CMND_NAME = 'phprefactor';
 export const PACKAGE_NAME = 'phpRefactor';
 export let config: vscode.WorkspaceConfiguration;
 export let filesExcludeGlob: any;
-export let extExclude: any;
 export let NS_EXTENSION_PROVIDER;
 
 export function showMessage(msg, error = true, items: any = []) {
@@ -16,15 +15,7 @@ export function showMessage(msg, error = true, items: any = []) {
 
 export function setConfig() {
     config = vscode.workspace.getConfiguration(PACKAGE_NAME);
-
-    const filesConfig = vscode.workspace.getConfiguration('files');
-    const searchConfig = vscode.workspace.getConfiguration('search');
-    filesExcludeGlob = [...new Set([
-        ...Object.keys(filesConfig.watcherExclude),
-        ...Object.keys(searchConfig.exclude),
-    ])];
-
-    extExclude = config.excludeSubExtensions.join('|');
+    filesExcludeGlob = config.excludeList
 }
 
 export function getConfig(key) {
