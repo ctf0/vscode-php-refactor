@@ -1,7 +1,7 @@
 {
     "name": "vscode-php-refactor",
     "displayName": "PHP-Refactor",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "publisher": "ctf0",
     "icon": "images/icon.png",
     "engines": {
@@ -23,6 +23,10 @@
         "submenus": [
             {
                 "id": "phprefactor.editor.context",
+                "label": "PHP Refactor"
+            },
+            {
+                "id": "phprefactor.explorer.context",
                 "label": "PHP Refactor"
             }
         ],
@@ -47,11 +51,28 @@
                 {
                     "command": "phprefactor.add_phpdoc",
                     "when": "editorLangId == php && !editorHasSelection"
+                },
+                {
+                    "command": "phprefactor.generate_namespace",
+                    "when": "false"
                 }
             ],
             "editor/context": [
                 {
                     "submenu": "phprefactor.editor.context",
+                    "group": "phprefactor"
+                }
+            ],
+            "explorer/context": [
+                {
+                    "submenu": "phprefactor.explorer.context",
+                    "group": "phprefactor"
+                }
+            ],
+            "phprefactor.explorer.context": [
+                {
+                    "command": "phprefactor.generate_namespace",
+                    "when": "explorerResourceIsFolder",
                     "group": "phprefactor"
                 }
             ],
@@ -109,6 +130,11 @@
             {
                 "command": "phprefactor.add_phpdoc",
                 "title": "Add PhpDoc (alias to 'intelephense.phpdoc.add')",
+                "category": "Php Refactor"
+            },
+            {
+                "command": "phprefactor.generate_namespace",
+                "title": "Generate/Update Namespace",
                 "category": "Php Refactor"
             }
         ],
@@ -174,9 +200,11 @@
     },
     "devDependencies": {
         "@types/fs-extra": "^11.0.4",
-        "@types/node": "^24.2.0",
+        "@types/lodash.set": "^4.3.9",
+        "@types/lodash.throttle": "^4.1.9",
+        "@types/node": "^24.2.1",
         "@types/vscode": "^1.90.0",
-        "esbuild": "^0.25.8",
+        "esbuild": "^0.25.9",
         "typescript": "^5.9.2"
     },
     "dependencies": {

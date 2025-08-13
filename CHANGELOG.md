@@ -55,3 +55,7 @@
 - better api
 - change `phpRefactor.excludeSubExtensions` to `phpRefactor.excludeList`, as we dont rely on the search/files exclude anymore
 - update deps
+
+## 0.2.1
+
+- add a way to update/generate directory files namespace in bulk

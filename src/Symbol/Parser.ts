@@ -1,7 +1,7 @@
-import * as PhpParser from 'php-parser';
-import * as vscode from 'vscode';
+import _set from 'lodash.set'
+import * as PhpParser from 'php-parser'
+import * as vscode from 'vscode'
 
-const _set = require('lodash.set');
 const Parser = new PhpParser.Engine({
     parser: {
         extractDoc: true,
@@ -10,20 +10,20 @@ const Parser = new PhpParser.Engine({
     ast: {
         withPositions: true,
     },
-});
+})
 
 function buildASTFromContent(content: string) {
-    return Parser.parseCode(content, '*.php');
+    return Parser.parseCode(content, '*.php')
 }
 
 export function getClassASTFromContent(content: string) {
     try {
-        const AST = buildASTFromContent(content);
+        const AST = buildASTFromContent(content)
 
         return getClass(
-            AST?.children?.find((item: any) => item.kind == 'namespace') ||
-            AST,
-        );
+            AST?.children?.find((item: any) => item.kind == 'namespace')
+            || AST,
+        )
     } catch (error) {
         // console.error(error);
     }
@@ -31,12 +31,12 @@ export function getClassASTFromContent(content: string) {
 
 export function getMethodsOrFunctions(content: string) {
     try {
-        const _class = getClassASTFromContent(content);
+        const _class = getClassASTFromContent(content)
 
         if (_class) {
-            return getMethods(_class);
+            return getMethods(_class)
         } else {
-            return getFunctions(buildASTFromContent(content));
+            return getFunctions(buildASTFromContent(content))
         }
     } catch (error) {
         // console.error(error);
@@ -44,21 +44,21 @@ export function getMethodsOrFunctions(content: string) {
 }
 
 export function getMethods(_classAST: any): any[] | undefined {
-    return _classAST?.body.filter((item: any) => item.kind == 'method');
+    return _classAST?.body.filter((item: any) => item.kind == 'method')
 }
 
 export function getFunctions(AST) {
-    const filterExtra = AST?.children?.filter((item: any) => !new RegExp(/declare|usegroup|expressionstatement|function/).test(item.kind));
+    const filterExtra = AST?.children?.filter((item: any) => !new RegExp(/declare|usegroup|expressionstatement|function/).test(item.kind))
 
     return AST?.children
         ?.filter((item: any) => item.kind == 'function')
         .concat(getFunctionsLookup(filterExtra))
         .flat()
-        .filter((e) => e);
+        .filter((e) => e)
 }
 
 export function getConstructor(_classAST: any, getArgsOnly = false) {
-    const _const = getMethods(_classAST)?.find((item: any) => item.name.name == '__construct');
+    const _const = getMethods(_classAST)?.find((item: any) => item.name.name == '__construct')
 
     if (getArgsOnly) {
         return _const?.arguments.map((item: PhpParser.Parameter) =>
@@ -66,40 +66,40 @@ export function getConstructor(_classAST: any, getArgsOnly = false) {
                 leadingComments: _const.leadingComments,
                 visibility: flagsToVisibility(item.flags),
             }),
-        );
+        )
     }
 
-    return _const;
+    return _const
 }
 
 export function getClassScopeInsertLine(_classAST: any) {
-    let position: any = null;
+    let position: any = null
 
     // get last prop
-    const _properties = getAllProperties(_classAST);
+    const _properties = getAllProperties(_classAST)
 
     if (_properties && _properties.length) {
-        position = _properties[_properties.length - 1];
+        position = _properties[_properties.length - 1]
 
         return {
             line: position.loc.end.line - 1,
             column: position.loc.end.column,
             addPrefixLine: true,
             addSuffixLine: false,
-        };
+        }
     }
 
     // get first method
     // ~first method comment if found
-    const methods = getMethods(_classAST);
+    const methods = getMethods(_classAST)
 
     if (methods && methods.length) {
-        position = methods[0];
+        position = methods[0]
 
-        const _comments = position.leadingComments;
+        const _comments = position.leadingComments
 
         if (_comments) {
-            position = _comments[0];
+            position = _comments[0]
         }
 
         return {
@@ -107,80 +107,83 @@ export function getClassScopeInsertLine(_classAST: any) {
             column: position.loc.start.column,
             addPrefixLine: false,
             addSuffixLine: true,
-        };
+        }
     }
 
     // or class start
     // if non found
-    position = _classAST;
+    position = _classAST
 
     return {
         line: position.loc.end.line - 1,
         column: 0,
         addPrefixLine: false,
         addSuffixLine: true,
-    };
+    }
 }
 
 export function getAllProperties(_classAST: any) {
     return _classAST?.body
         .filter((item: any) => item.kind == 'propertystatement')
         .map((item: any) => { // because the parser doesnt return correct column
-            const start = item.loc.start;
-            let extraLength = start.column - (item.visibility.length + 1);
+            const start = item.loc.start
+            let extraLength = start.column - (item.visibility.length + 1)
 
             if (item.isStatic) {
-                extraLength -= 'static '.length;
+                extraLength -= 'static '.length
             }
 
-            _set(item, 'loc.start.column', extraLength);
-            _set(item, 'loc.end.column', item.loc.end.column + 1); // include the ;
-            _set(item, 'loc.start.offset', start.offset - extraLength);
+            _set(item, 'loc.start.column', extraLength)
+            _set(item, 'loc.end.column', item.loc.end.column + 1) // include the ;
+            _set(item, 'loc.start.offset', start.offset - extraLength)
 
-            return item;
-        });
+            return item
+        })
 }
 
 function getClass(AST) {
-    return AST?.children?.find((item: any) => ['class', 'trait'].includes(item.kind));
+    return AST?.children?.find((item: any) => ['class', 'trait'].includes(item.kind))
 }
 
 function getFunctionsLookup(filterExtra) {
-    const list: any = [];
+    const list: any = []
 
     for (const item of filterExtra) {
-        list.push(item.body?.children?.filter((item: any) => item.kind == 'function'));
+        list.push(item.body?.children?.filter((item: any) => item.kind == 'function'))
     }
 
-    return list;
+    return list
 }
 
-export function getRangeFromLoc(start: { line: number; column: number; }, end: { line: number; column: number; }): vscode.Range {
+export function getRangeFromLoc(start: {line: number, column: number}, end: {line: number, column: number}): vscode.Range {
     return new vscode.Range(
         new vscode.Position(start.line - 1, start.column),
         new vscode.Position(end.line - 1, end.column),
-    );
+    )
 }
 
 function flagsToVisibility(flags: number): string {
-    let type = '';
+    let type = ''
 
     switch (flags) {
         case 1:
-            type = 'public';
+            type = 'public'
+            break
         case 2:
-            type = 'protected';
+            type = 'protected'
+            break
         case 4:
-            type = 'private';
+            type = 'private'
+            break
     }
 
-    return type;
+    return type
 }
 
 export function hasStartOrEndIntersection(symbol, selection): boolean {
-    return symbol.loc.start.line === selection.start.line || symbol.loc.end.line === selection.end.line;
+    return symbol.loc.start.line === selection.start.line || symbol.loc.end.line === selection.end.line
 }
 
 export function hasIntersection(symbol, lineNumber): boolean {
-    return symbol.loc.start.line - 1 <= lineNumber && symbol.loc.end.line - 1 >= lineNumber;
+    return symbol.loc.start.line - 1 <= lineNumber && symbol.loc.end.line - 1 >= lineNumber
 }
