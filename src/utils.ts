@@ -21,7 +21,7 @@ export function setConfig(): void {
     filesExcludeGlob = getConfig('excludeList') as string[]
 }
 
-export function getConfig(key: string): unknown {
+export function getConfig(key: string): any {
     return config.get(key)
 }
 

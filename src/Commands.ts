@@ -8,6 +8,7 @@ const NAMESPACE_REG = /^namespace/m
 export async function generateNamespaceForDirFiles(uri: vscode.Uri) {
     const dirPath = uri.fsPath
     const noNSExclude = utils.getConfig('noNamespaceList')?.map((item) => escapeStringRegexp(item)).join('|')
+    let phpFiles: any = await glob(`**/*${utils.EXT}`, {
         cwd: dirPath,
         ignore: utils.filesExcludeGlob,
     })
