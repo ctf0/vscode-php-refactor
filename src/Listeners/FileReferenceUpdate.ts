@@ -104,7 +104,7 @@ async function updateFileNamespace(fileToPath: string, progress: vscode.Progress
         },
     })
 
-    return results[0].hasChanged
+    return results.some((item) => item.hasChanged)
 }
 
 /* Files Rename ------------------------------------------------------------- */
@@ -134,7 +134,7 @@ async function updateFileTypeNameByFileName(
         },
     })
 
-    return results[0].hasChanged
+    return results.some((item) => item.hasChanged)
 }
 
 async function updateFileTypeContentEverywhere(

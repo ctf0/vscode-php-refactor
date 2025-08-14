@@ -1,3 +1,4 @@
+import escapeStringRegexp from 'escape-string-regexp'
 import {glob} from 'fast-glob'
 import {replaceInFile} from 'replace-in-file'
 import * as vscode from 'vscode'
@@ -6,10 +7,9 @@ const NAMESPACE_REG = /^namespace/m
 
 export async function generateNamespaceForDirFiles(uri: vscode.Uri) {
     const dirPath = uri.fsPath
-    const exc = utils.filesExcludeGlob
-    let phpFiles: any = await glob(`**/*${utils.EXT}`, {
+    const noNSExclude = utils.getConfig('noNamespaceList')?.map((item) => escapeStringRegexp(item)).join('|')
         cwd: dirPath,
-        ignore: exc,
+        ignore: utils.filesExcludeGlob,
     })
 
     if (!phpFiles.length) {
@@ -37,6 +37,10 @@ export async function generateNamespaceForDirFiles(uri: vscode.Uri) {
                     if (input.match(NAMESPACE_REG)) {
                         input = input.replace(new RegExp(/(\n)?^namespace.*(\n)?/, 'm'), ns)
                     } else {
+                        if (file.match(new RegExp(noNSExclude, 'g'))) {
+                            return input
+                        }
+
                         input = input.replace(new RegExp(/^<\?php(\n)?/, 'm'), `<?php\n${ns}`)
                     }
                 }
@@ -49,7 +53,7 @@ export async function generateNamespaceForDirFiles(uri: vscode.Uri) {
             increment: 100,
         })
 
-        if (results[0].hasChanged) {
+        if (results.some((item) => item.hasChanged)) {
             utils.showMessage('All done', false)
         } else {
             utils.showMessage('Nothing changed', false)

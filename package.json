@@ -1,7 +1,7 @@
 {
     "name": "vscode-php-refactor",
     "displayName": "PHP-Refactor",
-    "version": "0.2.2",
+    "version": "0.2.3",
     "publisher": "ctf0",
     "icon": "images/icon.png",
     "engines": {
@@ -173,6 +173,20 @@
                     "minItems": 1,
                     "uniqueItems": true,
                     "markdownDescription": "list of globs to ignore when replacing"
+                },
+                "phpRefactor.noNamespaceList": {
+                    "type": "array",
+                    "default": [
+                        "config/",
+                        "routes/",
+                        "lang/"
+                    ],
+                    "items": {
+                        "type": "string"
+                    },
+                    "minItems": 1,
+                    "uniqueItems": true,
+                    "markdownDescription": "list of globs to ignore when using `Generate/Update Namespace` command"
                 },
                 "phpRefactor.magicMethods": {
                     "type": "array",

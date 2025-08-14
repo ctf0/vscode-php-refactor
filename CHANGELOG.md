@@ -63,3 +63,7 @@
 ## 0.2.2
 
 - fix not respecting the excluded paths
+
+## 0.2.3
+
+- fix adding namespaces to file that usually doesnt have one ex.`configs, routes, lang`
