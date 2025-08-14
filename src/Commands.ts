@@ -1,4 +1,4 @@
-import {glob} from 'fs-extra'
+import {glob} from 'fast-glob'
 import {replaceInFile} from 'replace-in-file'
 import * as vscode from 'vscode'
 import * as utils from './utils'
@@ -6,9 +6,10 @@ const NAMESPACE_REG = /^namespace/m
 
 export async function generateNamespaceForDirFiles(uri: vscode.Uri) {
     const dirPath = uri.fsPath
+    const exc = utils.filesExcludeGlob
     let phpFiles: any = await glob(`**/*${utils.EXT}`, {
         cwd: dirPath,
-        ignore: utils.filesExcludeGlob,
+        ignore: exc,
     })
 
     if (!phpFiles.length) {

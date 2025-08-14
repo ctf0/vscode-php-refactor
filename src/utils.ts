@@ -1,4 +1,4 @@
-import glob from 'fast-glob'
+import {glob} from 'fast-glob'
 import path from 'node:path'
 import * as vscode from 'vscode'
 import type {FileNameAndNamespace, NamespaceProvider, ShowMessageResult} from './types'

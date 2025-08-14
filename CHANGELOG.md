@@ -59,3 +59,7 @@
 ## 0.2.1
 
 - add a way to update/generate directory files namespace in bulk
+
+## 0.2.2
+
+- fix not respecting the excluded paths

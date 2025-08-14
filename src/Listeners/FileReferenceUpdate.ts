@@ -1,5 +1,6 @@
 import escapeStringRegexp from 'escape-string-regexp'
-import fs, {glob} from 'fs-extra'
+import {glob} from 'fast-glob'
+import fs from 'node:fs/promises'
 import {replaceInFile} from 'replace-in-file'
 import * as vscode from 'vscode'
 import * as utils from '../utils'
