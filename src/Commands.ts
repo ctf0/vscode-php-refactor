@@ -14,7 +14,7 @@ export async function generateNamespaceForDirFiles(uri: vscode.Uri) {
     })
 
     if (!phpFiles.length) {
-        return utils.showMessage('no php files found')
+        return utils.showMessage('no php files found', true)
     }
 
     vscode.window.withProgress({
@@ -50,14 +50,15 @@ export async function generateNamespaceForDirFiles(uri: vscode.Uri) {
             },
         })
 
+        if (results.some((item) => item.hasChanged)) {
+            await utils.runComposer(uri)
+            utils.showMessage('All done')
+        } else {
+            utils.showMessage('Nothing changed')
+        }
+
         progress.report({
             increment: 100,
         })
-
-        if (results.some((item) => item.hasChanged)) {
-            utils.showMessage('All done', false)
-        } else {
-            utils.showMessage('Nothing changed', false)
-        }
     })
 }

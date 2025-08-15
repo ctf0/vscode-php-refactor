@@ -1,16 +1,20 @@
+import {execa} from 'execa'
 import {glob} from 'fast-glob'
 import path from 'node:path'
+import stripAnsi from 'strip-ansi'
 import * as vscode from 'vscode'
-import type {FileNameAndNamespace, NamespaceProvider, ShowMessageResult} from './types'
+import type * as types from './types'
 
 export const PACKAGE_CMND_NAME = 'phprefactor'
 export const PACKAGE_NAME = 'phpRefactor'
 export let config: vscode.WorkspaceConfiguration
 export let filesExcludeGlob: string[]
-export let NS_EXTENSION_PROVIDER: NamespaceProvider
+export let NS_EXTENSION_PROVIDER: types.NamespaceProvider
 export const EXT = '.php'
+export let composerCmnd = ''
+export const outputChannel = vscode.window.createOutputChannel('PHP Refactor')
 
-export function showMessage(msg: string, error = true, items: string[] = []): ShowMessageResult {
+export function showMessage(msg: string, error = false, items: string[] = []): types.ShowMessageResult {
     return error
         ? vscode.window.showErrorMessage(`PHP Refactor: ${msg}`, ...items)
         : vscode.window.showInformationMessage(`PHP Refactor: ${msg}`, ...items)
@@ -19,6 +23,7 @@ export function showMessage(msg: string, error = true, items: string[] = []): Sh
 export function setConfig(): void {
     config = vscode.workspace.getConfiguration(PACKAGE_NAME)
     filesExcludeGlob = getConfig('excludeList') as string[]
+    composerCmnd = getConfig('composerCommand') as string
 }
 
 export function getConfig(key: string): any {
@@ -53,7 +58,7 @@ export async function NsExtensionProviderInit(): Promise<void> {
         throw new Error('Depends on \'ctf0.php-namespace-resolver\' extension')
     }
 
-    NS_EXTENSION_PROVIDER = await nsResolverExtension.activate() as NamespaceProvider
+    NS_EXTENSION_PROVIDER = await nsResolverExtension.activate() as types.NamespaceProvider
 }
 
 export function sortSelections(selections: vscode.Selection[]): vscode.Selection[] {
@@ -70,7 +75,7 @@ export function sortSelections(selections: vscode.Selection[]): vscode.Selection
     })
 }
 
-export async function getFileNameAndNamespace(fileToPath: string, fileFromPath: string): Promise<FileNameAndNamespace> {
+export async function getFileNameAndNamespace(fileToPath: string, fileFromPath: string): Promise<types.FileNameAndNamespace> {
     const to_fn = getFileNameFromPath(fileToPath)
     const from_fn = getFileNameFromPath(fileFromPath)
 
@@ -103,4 +108,47 @@ export function getCWD(path: string): string | undefined {
 
 export function getFilesList(path: string): Promise<string | string[]> {
     return glob(`${getCWD(path)}/**/*${EXT}`, {ignore: filesExcludeGlob})
+}
+
+export async function runComposer(uri?: vscode.Uri): Promise<void> {
+    const result = await showMessage('Dont Forget to run {composer dump}, would you like to run it now ?', false, ['Yes', 'Dismiss'])
+
+    if (result === 'Yes') {
+        outputChannel.clear()
+        outputChannel.appendLine('Running composer dump-autoload...')
+
+        try {
+            const cwd = getCWD(uri?.fsPath)
+            const {stderr, stdout} = await execa(composerCmnd, {
+                cwd,
+                shell: vscode.env.shell,
+            })
+
+            if (stderr) {
+                outputChannel.appendLine('--- STDOUT ---')
+                outputChannel.appendLine(stripAnsi(stdout))
+                outputChannel.appendLine(stripAnsi(stderr))
+
+                return outputChannel.show()
+            }
+
+            showMessage('All Done')
+        } catch (error: any) {
+            outputChannel.appendLine('❌ Composer command failed')
+            outputChannel.appendLine(`Error: ${error.message}`)
+
+            if (error.stdout) {
+                outputChannel.appendLine('--- STDOUT ---')
+                outputChannel.appendLine(error.stdout)
+            }
+
+            if (error.stderr) {
+                outputChannel.appendLine('--- STDERR ---')
+                outputChannel.appendLine(error.stderr)
+            }
+
+            showMessage(`Composer command failed: ${error.message}`, true)
+            outputChannel.show()
+        }
+    }
 }

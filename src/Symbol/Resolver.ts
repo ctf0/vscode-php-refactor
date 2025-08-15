@@ -27,7 +27,7 @@ export default class Resolver {
 
         if (!editor) {
             const err = 'Error editor not available'
-            utils.showMessage(err)
+            utils.showMessage(err, true)
             throw new Error(err)
         }
 
@@ -39,7 +39,7 @@ export default class Resolver {
         this.setEditorAndAST()
 
         if (!this.CLASS_AST || this.CLASS_AST.kind !== 'class') {
-            utils.showMessage(`only classes can have ${methodName}`)
+            utils.showMessage(`only classes can have ${methodName}`, true)
             return
         }
 
@@ -265,7 +265,7 @@ export default class Resolver {
         const activeLine = selection.active.line
 
         if (selections.length > 1) {
-            return utils.showMessage('extract to function doesnt work with multiple selections')
+            return utils.showMessage('extract to function doesnt work with multiple selections', true)
         }
 
         try {
@@ -281,7 +281,7 @@ export default class Resolver {
             })
 
             if (!methodName) {
-                return utils.showMessage('please enter a method/function name', false)
+                return utils.showMessage('please enter a method/function name')
             }
 
             methodName = methodName.replace(/^\$/, '')
@@ -332,7 +332,7 @@ export default class Resolver {
 
             return this.addMethodDocs(document, methodName)
         } catch (error) {
-            utils.showMessage(error.message)
+            utils.showMessage(error.message, true)
 
             // console.error(error);
         }
@@ -371,7 +371,7 @@ export default class Resolver {
             })
 
             if (!propertyName) {
-                return utils.showMessage('please enter a property name', false)
+                return utils.showMessage('please enter a property name')
             }
 
             propertyName = propertyName.replace(/^\$/, '')
@@ -426,7 +426,7 @@ export default class Resolver {
                 }
             }, {undoStopBefore: false, undoStopAfter: false})
         } catch (error) {
-            utils.showMessage(error.message)
+            utils.showMessage(error.message, true)
 
             // console.error(error);
         }
@@ -439,7 +439,7 @@ export default class Resolver {
         const activeLine = selection.active.line
 
         if (selections.length > 1) {
-            return utils.showMessage('add missing function doesnt work with multiple selections')
+            return utils.showMessage('add missing function doesnt work with multiple selections', true)
         }
 
         try {
@@ -480,7 +480,7 @@ export default class Resolver {
                 }, {undoStopBefore: false, undoStopAfter: false})
             }
         } catch (error) {
-            utils.showMessage(error.message)
+            utils.showMessage(error.message, true)
 
             // console.error(error);
         }
@@ -493,7 +493,7 @@ export default class Resolver {
         const {selections, selection, document} = editor
 
         if (selections.length > 1) {
-            return utils.showMessage('add missing property doesnt work with multiple selections')
+            return utils.showMessage('add missing property doesnt work with multiple selections', true)
         }
 
         if (this.CLASS_AST) {

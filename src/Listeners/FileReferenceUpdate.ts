@@ -7,6 +7,7 @@ import * as utils from '../utils'
 
 const NAMESPACE_REG = /^namespace/m
 const ERROR_MSG = 'nothing changed as we cant correctly update references'
+let madeChanges = false
 
 export default async function updateFileReferences(event: vscode.FileRenameEvent): Promise<boolean> {
     if (!utils.getConfig('updateFileAndReferenceOnRename') as boolean) {
@@ -18,12 +19,12 @@ export default async function updateFileReferences(event: vscode.FileRenameEvent
         cancellable: false,
         title: 'Updating Please Wait',
     }, async(progress: vscode.Progress<{message?: string, increment?: number}>) => {
-        for (const file of event.files) {
-            const from = file.oldUri.fsPath
-            const to = file.newUri.fsPath
-            const _scheme = await fs.stat(to)
+        try {
+            for (const file of event.files) {
+                const from = file.oldUri.fsPath
+                const to = file.newUri.fsPath
+                const _scheme = await fs.stat(to)
 
-            try {
                 if (_scheme.isDirectory()) {
                     await replaceFromNamespaceForDirs(to, from, progress)
                 } else {
@@ -39,7 +40,7 @@ export default async function updateFileReferences(event: vscode.FileRenameEvent
                         const {_from, _to} = _getFileNameAndNamespace
 
                         if (!_from.namespace || !_to.namespace) {
-                            utils.showMessage(ERROR_MSG)
+                            utils.showMessage(ERROR_MSG, true)
                             continue
                         }
 
@@ -54,10 +55,13 @@ export default async function updateFileReferences(event: vscode.FileRenameEvent
                         }
                     }
                 }
-            } catch (error) {
-                console.error(error)
-                break
             }
+
+            if (madeChanges) {
+                await utils.runComposer(event.files[0].oldUri)
+            }
+        } catch (error) {
+            console.error(error)
         }
     })
 
@@ -158,7 +162,7 @@ async function updateFileTypeContentEverywhere(
 
     const escaped = escapeStringRegexp(fromNamespace)
 
-    await replaceInFile({
+    const results = await replaceInFile({
         files: await utils.getFilesList(fileToPath),
         processor: (input: string) => {
             input = input
@@ -183,7 +187,9 @@ async function updateFileTypeContentEverywhere(
         },
     })
 
-    return
+    if (results.some((item) => item.hasChanged)) {
+        madeChanges = true
+    }
 }
 
 /* Everywhere --------------------------------------------------------------- */
@@ -205,7 +211,7 @@ async function updateEverywhereForDirs(
         (!fromNamespace && toNamespace)
         || (fromNamespace && !toNamespace)
     ) {
-        utils.showMessage(ERROR_MSG)
+        utils.showMessage(ERROR_MSG, true)
 
         return
     }
@@ -214,10 +220,14 @@ async function updateEverywhereForDirs(
         message: `Everywhere: Updating references from ${fromNamespace} to ${toNamespace}`,
     })
 
-    return replaceInFile({
+    const results = await replaceInFile({
         files: await utils.getFilesList(dirToPath),
         processor: (input: string) => input.replace(new RegExp(escapeStringRegexp(fromNamespace), 'g'), toNamespace),
     })
+
+    if (results.some((item) => item.hasChanged)) {
+        madeChanges = true
+    }
 }
 
 async function updateOldNSPathEverywhere(
@@ -233,8 +243,12 @@ async function updateOldNSPathEverywhere(
     })
 
     // moved from/to namespace
-    return replaceInFile({
+    const results = await replaceInFile({
         files: await utils.getFilesList(fileToPath),
         processor: (input: string) => input.replace(new RegExp(escapeStringRegexp(fromNamespace), 'g'), toNamespace),
     })
+
+    if (results.some((item) => item.hasChanged)) {
+        madeChanges = true
+    }
 }

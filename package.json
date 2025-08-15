@@ -1,7 +1,7 @@
 {
     "name": "vscode-php-refactor",
     "displayName": "PHP-Refactor",
-    "version": "0.2.4",
+    "version": "0.2.5",
     "publisher": "ctf0",
     "icon": "images/icon.png",
     "engines": {
@@ -157,6 +157,11 @@
                     "default": true,
                     "description": "update file content & its reference everywhere when renamed/moved"
                 },
+                "phpRefactor.composerCommand": {
+                    "type": "string",
+                    "default": "composer dump-autoload",
+                    "description": "so we can update the class mapping after refactoring"
+                },
                 "phpRefactor.excludeList": {
                     "type": "array",
                     "default": [
@@ -223,11 +228,13 @@
     },
     "dependencies": {
         "escape-string-regexp": "^5.0.0",
+        "execa": "^9.6.0",
         "fast-glob": "^3.3.3",
         "lodash.set": "^4.3.2",
         "lodash.throttle": "^4.1.1",
         "php-parser": "^3.2.5",
-        "replace-in-file": "^8.3.0"
+        "replace-in-file": "^8.3.0",
+        "strip-ansi": "^7.1.0"
     },
     "extensionDependencies": [
         "bmewburn.vscode-intelephense-client",

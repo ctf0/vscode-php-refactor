@@ -66,4 +66,8 @@
 
 ## 0.2.3
 
-- fix adding namespaces to file that usually doesnt have one ex.`configs, routes, lang`
+- fix adding namespaces to file that usually doesnt have one ex.`configs, routes, lang
+
+## 0.2.5
+
+- add an option to run `composer dump` after namespace update
