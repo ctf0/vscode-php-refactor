@@ -1,3 +1,4 @@
+import escapeStringRegexp from 'escape-string-regexp'
 import {execa} from 'execa'
 import {glob} from 'fast-glob'
 import path from 'node:path'
@@ -9,6 +10,7 @@ export const PACKAGE_CMND_NAME = 'phprefactor'
 export const PACKAGE_NAME = 'phpRefactor'
 export let config: vscode.WorkspaceConfiguration
 export let filesExcludeGlob: string[]
+export let noNamespaceList: string[]
 export let NS_EXTENSION_PROVIDER: types.NamespaceProvider
 export const EXT = '.php'
 export let composerCmnd = ''
@@ -24,6 +26,7 @@ export function setConfig(): void {
     config = vscode.workspace.getConfiguration(PACKAGE_NAME)
     filesExcludeGlob = getConfig('excludeList') as string[]
     composerCmnd = getConfig('composerCommand') as string
+    noNamespaceList = getConfig('noNamespaceList')?.map((item) => escapeStringRegexp(item)).join('|')
 }
 
 export function getConfig(key: string): any {

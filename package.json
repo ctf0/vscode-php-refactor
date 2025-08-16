@@ -1,7 +1,7 @@
 {
     "name": "vscode-php-refactor",
     "displayName": "PHP-Refactor",
-    "version": "0.2.5",
+    "version": "0.2.6",
     "publisher": "ctf0",
     "icon": "images/icon.png",
     "engines": {
@@ -53,6 +53,10 @@
                     "when": "editorLangId == php && !editorHasSelection"
                 },
                 {
+                    "command": "phprefactor.extract_to_class",
+                    "when": "editorLangId == php && editorHasSelection && !editorHasMultipleSelections"
+                },
+                {
                     "command": "phprefactor.generate_namespace",
                     "when": "false"
                 }
@@ -93,6 +97,11 @@
                     "group": "phprefactor"
                 },
                 {
+                    "command": "phprefactor.extract_to_class",
+                    "when": "editorLangId == php && editorHasSelection && !editorHasMultipleSelections",
+                    "group": "phprefactor"
+                },
+                {
                     "command": "phprefactor.add_new_property",
                     "when": "editorLangId == php && !editorHasSelection"
                 }
@@ -120,6 +129,11 @@
             {
                 "command": "phprefactor.extract_to_property",
                 "title": "Extract To Property",
+                "category": "PHP Refactor"
+            },
+            {
+                "command": "phprefactor.extract_to_class",
+                "title": "Extract To New Class",
                 "category": "PHP Refactor"
             },
             {
@@ -169,6 +183,7 @@
                         "**/node_modules/**",
                         "**/public/**",
                         "**/cache/**",
+                        "**/lang/**",
                         "**/resources/**",
                         "**/storage/**"
                     ],
@@ -184,7 +199,6 @@
                     "default": [
                         "config/",
                         "routes/",
-                        "lang/",
                         "tests/"
                     ],
                     "items": {

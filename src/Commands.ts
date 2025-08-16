@@ -1,4 +1,3 @@
-import escapeStringRegexp from 'escape-string-regexp'
 import {glob} from 'fast-glob'
 import {replaceInFile} from 'replace-in-file'
 import * as vscode from 'vscode'
@@ -7,7 +6,7 @@ const NAMESPACE_REG = /^namespace/m
 
 export async function generateNamespaceForDirFiles(uri: vscode.Uri) {
     const dirPath = uri.fsPath
-    const noNSExclude = utils.getConfig('noNamespaceList')?.map((item) => escapeStringRegexp(item)).join('|')
+    const noNSExclude = utils.noNamespaceList
     let phpFiles: any = await glob(`**/*${utils.EXT}`, {
         cwd: dirPath,
         ignore: utils.filesExcludeGlob,
@@ -17,7 +16,7 @@ export async function generateNamespaceForDirFiles(uri: vscode.Uri) {
         return utils.showMessage('no php files found', true)
     }
 
-    vscode.window.withProgress({
+    await vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
         cancellable: false,
         title: 'Updating Please Wait',

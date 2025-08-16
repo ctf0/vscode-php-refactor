@@ -98,6 +98,11 @@ export default class CodeAction implements vscode.CodeActionProvider {
                                 title: 'Copy To Method/Function',
                                 type: vscode.CodeActionKind.RefactorExtract,
                             },
+                            {
+                                command: `${utils.PACKAGE_CMND_NAME}.extract_to_class`,
+                                title: 'Extract To New Class',
+                                type: vscode.CodeActionKind.RefactorRewrite,
+                            },
                         )
                     }
                 }

@@ -14,7 +14,7 @@ export default async function updateFileReferences(event: vscode.FileRenameEvent
         return false
     }
 
-    vscode.window.withProgress({
+    await vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
         cancellable: false,
         title: 'Updating Please Wait',
@@ -58,7 +58,7 @@ export default async function updateFileReferences(event: vscode.FileRenameEvent
             }
 
             if (madeChanges) {
-                await utils.runComposer(event.files[0].oldUri)
+                await utils.runComposer(event.files[0].newUri)
             }
         } catch (error) {
             console.error(error)
@@ -93,7 +93,7 @@ async function updateFileNamespace(fileToPath: string, progress: vscode.Progress
     const toNamespace = await utils.getNamespaceFromPath(fileToPath)
 
     progress.report({
-        message: `New File: Updating file namespace to ${toNamespace}`,
+        message: `Updating file namespace to "${toNamespace}"`,
     })
 
     const results: any = await replaceInFile({
@@ -121,7 +121,7 @@ async function updateFileTypeNameByFileName(
     const TYPES = '^((?:(?:final|abstract) +)?(?:(?:readonly) +)?(?:class|interface|enum|trait) +)'
 
     progress.report({
-        message: `File: Updating file type name from ${_from.name} to ${_to.name}`,
+        message: `Updating file type name from "${_from.name}" to "${_to.name}"`,
     })
 
     const results: any = await replaceInFile({
@@ -157,7 +157,7 @@ async function updateFileTypeContentEverywhere(
     }
 
     progress.report({
-        message: `Everywhere: Updating references from ${fromNamespace} to ${toNamespace}`,
+        message: `Updating references from "${fromNamespace}" to "${toNamespace}"`,
     })
 
     const escaped = escapeStringRegexp(fromNamespace)
@@ -217,7 +217,7 @@ async function updateEverywhereForDirs(
     }
 
     progress.report({
-        message: `Everywhere: Updating references from ${fromNamespace} to ${toNamespace}`,
+        message: `Updating references from "${fromNamespace}" to "${toNamespace}"`,
     })
 
     const results = await replaceInFile({
@@ -239,7 +239,7 @@ async function updateOldNSPathEverywhere(
     const toNamespace = _to.namespace
 
     progress.report({
-        message: `Old File: Updating references from ${fromNamespace} to ${toNamespace}`,
+        message: `Updating references from "${fromNamespace}" to "${toNamespace}"`,
     })
 
     // moved from/to namespace

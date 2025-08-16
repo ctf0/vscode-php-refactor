@@ -432,6 +432,213 @@ export default class Resolver {
         }
     }
 
+    async extractToClass() {
+        const editor = this.getEditor()
+        const {selections, selection, document} = editor
+        const activeLine = selection.active.line
+
+        if (selections.length > 1) {
+            return utils.showMessage('extract to class doesnt work with multiple selections', true)
+        }
+
+        try {
+            const _methodsOrFunctions = parser.getMethodsOrFunctions(document.getText())
+            const functionBody = this.getIntersectedMethodOrFunction(_methodsOrFunctions, activeLine)
+
+            this.checkForStartOrEndIntersection(functionBody, selection)
+
+            const selectionTxt = this.checkStartWithChar(document, selection)
+
+            // Show directory picker
+            const selectedDirectory = await vscode.window.showOpenDialog({
+                canSelectFiles: false,
+                canSelectFolders: true,
+                canSelectMany: false,
+                openLabel: 'Select Directory',
+                title: 'Select directory for new class',
+                defaultUri: vscode.workspace.workspaceFolders?.[0]?.uri,
+            })
+
+            if (!selectedDirectory || selectedDirectory.length === 0) {
+                return utils.showMessage('please select a directory')
+            }
+
+            const targetDirectory = selectedDirectory[0].fsPath
+
+            // Show input for class name
+            const className: any = await vscode.window.showInputBox({
+                placeHolder: 'Class name (e.g., MyNewClass)',
+                validateInput: (value: string) => {
+                    if (!value || value.trim().length === 0) {
+                        return 'Class name cannot be empty'
+                    }
+
+                    if (!/^[A-Z][a-zA-Z0-9_]*$/.test(value.trim())) {
+                        return 'Class name must start with uppercase letter and contain only letters, numbers, and underscores'
+                    }
+
+                    return null
+                },
+            })
+
+            if (!className) {
+                return utils.showMessage('please enter a class name')
+            }
+
+            // Create the new file path
+            const newFilePath = `${targetDirectory}/${className}.php`
+
+            // Check if file already exists
+            try {
+                await vscode.workspace.fs.stat(vscode.Uri.file(newFilePath))
+                return utils.showMessage('file already exists', true)
+            } catch {
+                // File doesn't exist, which is what we want
+            }
+
+            // Get namespace for the new file
+            const namespace = await utils.getNamespaceFromPath(newFilePath)
+            const namespaceDeclaration = namespace ? `${namespace}\n\n` : ''
+
+            // Check if the selection covers a complete method by comparing selection bounds with method bounds
+            const selectedMethod = this.findCompleteMethodInSelection(selection, _methodsOrFunctions)
+
+            let classContent: string
+            let methodName: string
+            let replacementText: string
+
+            if (selectedMethod) {
+                // Extract the complete method
+                methodName = selectedMethod.name.name
+                const isStatic = selectedMethod.isStatic === true
+                const methodParameters = this.generateMethodCallParameters(selectedMethod.arguments || [])
+
+                // Use the selected text as-is since it's a complete method
+                classContent = `<?php\n\n${namespaceDeclaration}class ${className}\n{\n    ${selectionTxt.trim()}\n}\n`
+
+                // Replace with class instantiation and method call
+                if (namespace) {
+                    const namespaceParts = utils.getFQNOnly(namespace)?.split('\\') || []
+                    const shortClassName = namespaceParts.length > 0 ? `\\${namespaceParts.join('\\')}\\${className}` : className
+                    replacementText = isStatic
+                        ? `${shortClassName}::${methodName}(${methodParameters});`
+                        : `(new ${shortClassName}())->${methodName}(${methodParameters});`
+                } else {
+                    replacementText = isStatic
+                        ? `${className}::${methodName}(${methodParameters});`
+                        : `(new ${className}())->${methodName}(${methodParameters});`
+                }
+            } else {
+                // Extract partial code into a new method
+                methodName = 'extractedMethod'
+                classContent = `<?php\n\n${namespaceDeclaration}class ${className}\n{\n    public function ${methodName}()\n    {\n        ${selectionTxt.split('\n').join('\n        ')}\n    }\n}\n`
+
+                if (namespace) {
+                    const namespaceParts = utils.getFQNOnly(namespace)?.split('\\') || []
+                    const shortClassName = namespaceParts.length > 0 ? `\\${namespaceParts.join('\\')}\\${className}` : className
+                    replacementText = `(new ${shortClassName}())->${methodName}();`
+                } else {
+                    replacementText = `(new ${className}())->${methodName}();`
+                }
+            }
+
+            // Create the new file
+            await vscode.workspace.fs.writeFile(
+                vscode.Uri.file(newFilePath),
+                Buffer.from(classContent),
+            )
+
+            // Replace the selection with class instantiation and method call
+            await editor.edit((edit: vscode.TextEditorEdit) => {
+                edit.replace(selection, replacementText)
+            }, {undoStopBefore: false, undoStopAfter: false})
+
+            // Open the new file
+            const newDocument = await vscode.workspace.openTextDocument(newFilePath)
+            await vscode.window.showTextDocument(newDocument)
+
+            utils.showMessage(`Class ${className} created successfully`)
+        } catch (error: any) {
+            utils.showMessage(error.message, true)
+            // console.error(error);
+        }
+    }
+
+    findCompleteMethodInSelection(selection: vscode.Selection, methodsOrFunctions: any[]): any | null {
+        // Check if the selection exactly matches a method/function boundaries
+        for (const method of methodsOrFunctions) {
+            const methodStartLine = method.loc.start.line - 1
+            const methodEndLine = method.loc.end.line - 1
+
+            // Check if selection start and end match the method boundaries (with some tolerance for whitespace)
+            if (selection.start.line >= methodStartLine - 1
+              && selection.start.line <= methodStartLine + 1
+              && selection.end.line >= methodEndLine - 1
+              && selection.end.line <= methodEndLine + 1) {
+                return method
+            }
+        }
+
+        return null
+    }
+
+    generateMethodCallParameters(methodArguments: any[]): string {
+        if (!methodArguments || methodArguments.length === 0) {
+            return ''
+        }
+
+        return methodArguments.map((arg, index) => {
+            let paramName = (arg.name && arg.name.name) || `param${index + 1}`
+
+            // Ensure paramName is a string
+            if (typeof paramName !== 'string') {
+                paramName = `param${index + 1}`
+            }
+
+            // Remove $ prefix if it exists for cleaner placeholder
+            if (paramName.startsWith('$')) {
+                paramName = paramName.substring(1)
+            }
+
+            // Generate placeholder based on parameter type and default value
+            if (arg.value) {
+                // Has default value, make it optional with a meaningful placeholder
+                if (arg.type) {
+                    return `/* ${arg.type} */ $${paramName}`
+                }
+
+                return `$${paramName}`
+            } else {
+                // Required parameter
+                if (arg.type && arg.type.name) {
+                    // Has type hint
+                    const typeName = arg.type.name
+
+                    switch (typeName.toLowerCase()) {
+                        case 'string':
+                            return `'${paramName}'`
+                        case 'int':
+                        case 'integer':
+                            return '0'
+                        case 'bool':
+                        case 'boolean':
+                            return 'false'
+                        case 'array':
+                            return '[]'
+                        case 'float':
+                        case 'double':
+                            return '0.0'
+                        default:
+                            return `$${paramName}`
+                    }
+                } else {
+                    // No type hint, use variable placeholder
+                    return `$${paramName}`
+                }
+            }
+        }).join(', ')
+    }
+
     /* Missing ------------------------------------------------------------------ */
     async addMissingMethod() {
         const editor = this.getEditor()
