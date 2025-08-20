@@ -1,7 +1,7 @@
 {
     "name": "vscode-php-refactor",
     "displayName": "PHP-Refactor",
-    "version": "0.2.6",
+    "version": "0.2.7",
     "publisher": "ctf0",
     "icon": "images/icon.png",
     "engines": {

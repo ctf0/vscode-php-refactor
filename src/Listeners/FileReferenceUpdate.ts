@@ -58,10 +58,12 @@ export default async function updateFileReferences(event: vscode.FileRenameEvent
             }
 
             if (madeChanges) {
-                await utils.runComposer(event.files[0].newUri)
+                utils.runComposer(event.files[0].newUri)
             }
         } catch (error) {
             console.error(error)
+        } finally {
+            progress.report({increment: 100})
         }
     })
 
@@ -108,7 +110,13 @@ async function updateFileNamespace(fileToPath: string, progress: vscode.Progress
         },
     })
 
-    return results.some((item) => item.hasChanged)
+    const check = results.some((item) => item.hasChanged)
+
+    if (check) {
+        madeChanges = true
+    }
+
+    return check
 }
 
 /* Files Rename ------------------------------------------------------------- */
@@ -138,7 +146,13 @@ async function updateFileTypeNameByFileName(
         },
     })
 
-    return results.some((item) => item.hasChanged)
+    const check = results.some((item) => item.hasChanged)
+
+    if (check) {
+        madeChanges = true
+    }
+
+    return check
 }
 
 async function updateFileTypeContentEverywhere(

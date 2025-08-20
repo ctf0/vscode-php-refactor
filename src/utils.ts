@@ -114,7 +114,7 @@ export function getFilesList(path: string): Promise<string | string[]> {
 }
 
 export async function runComposer(uri?: vscode.Uri): Promise<void> {
-    const result = await showMessage('Dont Forget to run {composer dump}, would you like to run it now ?', false, ['Yes', 'Dismiss'])
+    const result = showMessage('Dont Forget to run {composer dump}, would you like to run it now ?', false, ['Yes', 'Dismiss'])
 
     if (result === 'Yes') {
         outputChannel.clear()

@@ -71,3 +71,7 @@
 ## 0.2.5
 
 - add an option to run `composer dump` after namespace update
+
+## 0.2.7
+
+- hide the progress once everything is done
