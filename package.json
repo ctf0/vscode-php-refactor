@@ -237,7 +237,7 @@
         "@types/lodash.throttle": "^4.1.9",
         "@types/node": "^24.2.1",
         "@types/vscode": "^1.90.0",
-        "esbuild": "^0.25.9",
+        "esbuild": "^0.28.1",
         "typescript": "^5.9.2"
     },
     "dependencies": {
