@@ -1,6 +1,7 @@
 import throttle from 'lodash.throttle'
 import * as vscode from 'vscode'
 import * as symbolsAndReferences from '../Symbol/SymbolsAndReferences'
+import * as parser from '../Symbol/Parser'
 import * as utils from '../utils'
 
 export default class CodeAction implements vscode.CodeActionProvider {
@@ -19,6 +20,15 @@ export default class CodeAction implements vscode.CodeActionProvider {
         const {selections} = editor
 
         const commands: any[] = []
+        const functionLike = parser.getFunctionLikeAtLines(document.getText(), range.start.line, range.end.line)
+
+        if (functionLike && range.isEmpty) {
+            commands.push({
+                command: `${utils.PACKAGE_CMND_NAME}.toggle_function_syntax`,
+                title: functionLike.kind === 'arrowfunc' ? 'Convert To Normal Function' : 'Convert To Short Function',
+                type: vscode.CodeActionKind.RefactorRewrite,
+            })
+        }
 
         if (symbols) {
             const _classSymbols: vscode.DocumentSymbol[] | undefined = symbolsAndReferences.extractClassSymbols(symbols)
@@ -68,7 +78,7 @@ export default class CodeAction implements vscode.CodeActionProvider {
 
                     if (propWordRange) {
                         const propName = document.getText(propWordRange)
-                        const _props: vscode.DocumentSymbol[] | undefined = await symbolsAndReferences.extractPropSymbols(_classSymbols)
+                        const _props: vscode.DocumentSymbol[] | undefined = symbolsAndReferences.extractPropSymbols(_classSymbols)
 
                         if (!_props || !_props.some((item) => item.name == `\$${propName}`)) {
                             commands.push(
@@ -92,11 +102,6 @@ export default class CodeAction implements vscode.CodeActionProvider {
                                 command: `${utils.PACKAGE_CMND_NAME}.extract_to_function`,
                                 title: 'Extract To Method/Function',
                                 type: vscode.CodeActionKind.RefactorRewrite,
-                            },
-                            {
-                                command: `${utils.PACKAGE_CMND_NAME}.copy_to_function`,
-                                title: 'Copy To Method/Function',
-                                type: vscode.CodeActionKind.RefactorExtract,
                             },
                             {
                                 command: `${utils.PACKAGE_CMND_NAME}.extract_to_class`,

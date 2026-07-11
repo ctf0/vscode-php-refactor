@@ -68,6 +68,42 @@ export default class Resolver {
         )
     }
 
+    getArgumentInsertPosition(document: vscode.TextDocument, functionLike: any): {
+        position: {line: number; column: number}
+        prefix: string
+    } {
+        const args = functionLike.arguments
+
+        if (args.length) {
+            const firstArg = args[0]
+            const lastArg = args[args.length - 1]
+
+            return {
+                position: {
+                    line: lastArg.loc.end.line - 1,
+                    column: lastArg.loc.end.column,
+                },
+                prefix: firstArg.loc.end.line === lastArg.loc.end.line ? ', ' : ',\n',
+            }
+        }
+
+        const functionText = document.getText(new vscode.Range(
+            functionLike.loc.start.line - 1,
+            functionLike.loc.start.column,
+            functionLike.body.loc.start.line - 1,
+            functionLike.body.loc.start.column,
+        ))
+        const position = document.positionAt(functionLike.loc.start.offset + functionText.indexOf('(') + 1)
+
+        return {
+            position: {
+                line: position.line,
+                column: position.character,
+            },
+            prefix: '',
+        }
+    }
+
     addNewProperty(): Thenable<any> | undefined {
         this.setEditorAndAST()
 
@@ -87,43 +123,9 @@ export default class Resolver {
         const insideConstructorBody = _const?.loc.start.line - 1 <= activeLine && _const?.loc.end.line - 1 >= activeLine
 
         if (_const && insideConstructorBody) {
-            const _propPromotions = _const.arguments
-
-            if (_propPromotions.length) {
-                const firstArg = _propPromotions[0]
-                const lastArg = _propPromotions[_propPromotions.length - 1]
-
-                position = {
-                    line: lastArg.loc.end.line - 1,
-                    column: lastArg.loc.end.column,
-                }
-
-                // args are multiline
-                if (firstArg !== lastArg && firstArg.loc.end.line !== lastArg.loc.end.line) {
-                    prefix = ',\n'
-                }
-
-                // one arg
-                // or multi args on the same line
-                if (firstArg === lastArg || (firstArg.loc.end.line === lastArg.loc.end.line)) {
-                    prefix = ', '
-                }
-            } else {
-                // get insert place when no args
-                const constLineText = document.getText(new vscode.Range(
-                    _const.loc.start.line - 1,
-                    _const.loc.start.column,
-                    _const.body.loc.start.line - 1,
-                    _const.body.loc.start.column,
-                ))
-
-                position = document.positionAt(_const.loc.start.offset + constLineText.indexOf('(') + 1)
-
-                position = {
-                    line: position.line,
-                    column: position.character,
-                }
-            }
+            const insert = this.getArgumentInsertPosition(document, _const)
+            position = insert.position
+            prefix = insert.prefix
         }
 
         const _methodsOrFunctions = parser.getMethodsOrFunctions(this.getEditor().document.getText())
@@ -134,44 +136,9 @@ export default class Resolver {
 
         if (_methods && insideMethodBody && !insideConstructorBody) {
             snippet = '\${1:type} \$\${2:var}\${3: = \${4:\'value\'}}'
-
-            const args = insideMethodBody?.arguments
-
-            if (args.length) {
-                const firstArg = args[0]
-                const lastArg = args[args.length - 1]
-
-                position = {
-                    line: lastArg.loc.end.line - 1,
-                    column: lastArg.loc.end.column,
-                }
-
-                // args are multiline
-                if (firstArg !== lastArg && firstArg.loc.end.line !== lastArg.loc.end.line) {
-                    prefix = ',\n'
-                }
-
-                // one arg
-                // or multi args on the same line
-                if (firstArg === lastArg || (firstArg.loc.end.line === lastArg.loc.end.line)) {
-                    prefix = ', '
-                }
-            } else {
-                // get insert place when no args
-                const constLineText = document.getText(new vscode.Range(
-                    insideMethodBody.loc.start.line - 1,
-                    insideMethodBody.loc.start.column,
-                    insideMethodBody.body.loc.start.line - 1,
-                    insideMethodBody.body.loc.start.column,
-                ))
-
-                position = document.positionAt(insideMethodBody.loc.start.offset + constLineText.indexOf('(') + 1)
-
-                position = {
-                    line: position.line,
-                    column: position.character,
-                }
-            }
+            const insert = this.getArgumentInsertPosition(document, insideMethodBody)
+            position = insert.position
+            prefix = insert.prefix
         }
 
         // function
@@ -180,43 +147,9 @@ export default class Resolver {
 
         if (_functions && insideFunctionBody) {
             snippet = '\${1:type} \$\${2:var}\${3: = \${4:\'value\'}}'
-            const args = insideFunctionBody?.arguments
-
-            if (args.length) {
-                const firstArg = args[0]
-                const lastArg = args[args.length - 1]
-
-                position = {
-                    line: lastArg.loc.end.line - 1,
-                    column: lastArg.loc.end.column,
-                }
-
-                // args are multiline
-                if (firstArg !== lastArg && firstArg.loc.end.line !== lastArg.loc.end.line) {
-                    prefix = ',\n'
-                }
-
-                // one arg
-                // or multi args on the same line
-                if (firstArg === lastArg || (firstArg.loc.end.line === lastArg.loc.end.line)) {
-                    prefix = ', '
-                }
-            } else {
-                // get insert place when no args
-                const constLineText = document.getText(new vscode.Range(
-                    insideFunctionBody.loc.start.line - 1,
-                    insideFunctionBody.loc.start.column,
-                    insideFunctionBody.body.loc.start.line - 1,
-                    insideFunctionBody.body.loc.start.column,
-                ))
-
-                position = document.positionAt(insideFunctionBody.loc.start.offset + constLineText.indexOf('(') + 1)
-
-                position = {
-                    line: position.line,
-                    column: position.character,
-                }
-            }
+            const insert = this.getArgumentInsertPosition(document, insideFunctionBody)
+            position = insert.position
+            prefix = insert.prefix
         }
 
         if (!insideConstructorBody && !insideMethodBody && !insideFunctionBody) {
@@ -275,6 +208,21 @@ export default class Resolver {
             this.checkForStartOrEndIntersection(functionBody, selection)
 
             const selectionTxt = this.checkStartWithChar(document, selection)
+            const hasReturn = parser.hasReturn(selectionTxt)
+            const dependencies = parser.getVariableNames(selectionTxt)
+            const methodParameters = dependencies.map((name) => {
+                const argument = functionBody.arguments?.find((item) => item.name.name === name)
+
+                if (!argument) {
+                    return `$${name}`
+                }
+
+                const prefix = document.getText(parser.getRangeFromLoc(argument.loc.start, argument.name.loc.start)).trim()
+                const cleanPrefix = prefix.replace(/^(public|protected|private|readonly)\s+/, '')
+
+                return `${cleanPrefix}${cleanPrefix && !cleanPrefix.endsWith('&') ? ' ' : ''}$${name}`
+            })
+            const methodArguments = dependencies.map((name) => `$${name}`).join(', ')
 
             let methodName: any = await vscode.window.showInputBox({
                 placeHolder: 'function/method name',
@@ -304,9 +252,12 @@ export default class Resolver {
 
             const methodType = isFunction ? '' : 'private '
             const _static = isStatic ? 'static ' : ''
+            const functionHeader = document.getText(parser.getRangeFromLoc(functionBody.loc.start, functionBody.body.loc.start))
+            const returnType = hasReturn ? functionHeader.match(/\)\s*:\s*(.+?)\s*$/s)?.[1] : undefined
+            const returnDeclaration = returnType ? `: ${returnType}` : ''
 
             const methodContent = '\n\n'
-              + `${indentation}${methodType}${_static}function ${methodName}()\n`
+              + `${indentation}${methodType}${_static}function ${methodName}(${methodParameters.join(', ')})${returnDeclaration}\n`
               + `${indentation}{\n`
               + `${indentation}${indentation || contentIndentation}${selectionTxt}\n`
               + `${indentation}}`
@@ -326,11 +277,11 @@ export default class Resolver {
                         ? ''
                         : (isStatic ? 'self::' : '$this->')
 
-                    edit.replace(selection, `${_this}${methodName}();`)
+                    edit.replace(selection, `${hasReturn ? 'return ' : ''}${_this}${methodName}(${methodArguments});`)
                 }, {undoStopBefore: false, undoStopAfter: false})
             }
 
-            return this.addMethodDocs(document, methodName)
+            return
         } catch (error) {
             utils.showMessage(error.message, true)
 
@@ -338,17 +289,89 @@ export default class Resolver {
         }
     }
 
-    async copyToFunction() {
-        await this.extractToFunction(false)
-    }
+    async toggleFunctionSyntax() {
+        const editor = this.getEditor()
+        const {document, selection} = editor
+        const functionLike = parser.getFunctionLikeAtLines(document.getText(), selection.start.line, selection.end.line)
 
-    async addMethodDocs(document: vscode.TextDocument, methodName: string): Promise<unknown> {
-        const symbols = await symbolsAndReferences.getFileSymbols(document.uri)
-        // @ts-expect-error ignore
-        const _methodsOrFunctions = symbolsAndReferences.extractMethodOrFunctionsSymbols(symbols)
-        const _methodRange = _methodsOrFunctions?.find((symbol) => symbol.name == methodName)
+        if (!functionLike) {
+            return utils.showMessage('place the cursor inside a closure or arrow function', true)
+        }
 
-        return this.insertPhpDocs(document, _methodRange?.range)
+        const functionRange = parser.getRangeFromLoc(functionLike.loc.start, functionLike.loc.end)
+        const functionText = document.getText(functionRange)
+        const bodyOffset = functionLike.body.loc.start.offset - functionLike.loc.start.offset
+        const header = functionText.slice(0, bodyOffset)
+        const openingParenthesis = header.indexOf('(')
+        let depth = 0
+        let closingParenthesis = -1
+
+        for (let i = openingParenthesis; i < header.length; i++) {
+            if (header[i] === '(') depth++
+            if (header[i] === ')' && --depth === 0) {
+                closingParenthesis = i
+                break
+            }
+        }
+
+        if (openingParenthesis < 0 || closingParenthesis < 0) {
+            return utils.showMessage('unable to read the function arguments', true)
+        }
+
+        let replacement
+
+        if (functionLike.kind === 'arrowfunc') {
+            const expression = document.getText(parser.getRangeFromLoc(functionLike.body.loc.start, functionLike.body.loc.end)).trim()
+            const args = header.slice(openingParenthesis, closingParenthesis + 1)
+            const returnType = header.slice(closingParenthesis + 1).replace(/=>\s*$/, '').trim()
+            const line = document.lineAt(functionLike.loc.start.line - 1)
+            const indentation = line.text.substring(0, line.firstNonWhitespaceCharacterIndex)
+            const parameters = new Set(functionLike.arguments.map((argument) => argument.name.name))
+            const superglobals = new Set(['this', 'GLOBALS', '_SERVER', '_GET', '_POST', '_FILES', '_COOKIE', '_SESSION', '_REQUEST', '_ENV', 'http_response_header', 'argc', 'argv'])
+            const dependencies = new Set<string>()
+            const collectVariables = (node: any): void => {
+                if (!node || typeof node !== 'object') {
+                    return
+                }
+
+                if (node.kind === 'variable' && !parameters.has(node.name) && !superglobals.has(node.name)) {
+                    dependencies.add(`$${node.name}`)
+                }
+
+                Object.values(node).forEach(collectVariables)
+            }
+
+            collectVariables(functionLike.body)
+            const useClause = dependencies.size ? ` use (${[...dependencies].join(', ')})` : ''
+            replacement = `function${args}${useClause}${returnType ? ` ${returnType}` : ''} {\n`
+                + `${indentation}${this.DEFAULT_INDENT}return ${expression};\n`
+                + `${indentation}}`
+        } else {
+            const bodyChildren = functionLike.body.children || []
+            const returnStatement = bodyChildren.length === 1 && bodyChildren[0].kind === 'return'
+
+            if (!returnStatement || !bodyChildren[0].expr) {
+                return utils.showMessage('only closures with one return statement can be shortened', true)
+            }
+
+            if (functionLike.uses?.some((use) => use.byref)) {
+                return utils.showMessage('closures using references cannot be shortened', true)
+            }
+
+            const expression = document.getText(parser.getRangeFromLoc(
+                bodyChildren[0].expr.loc.start,
+                bodyChildren[0].expr.loc.end,
+            )).trim()
+            const args = header.slice(openingParenthesis, closingParenthesis + 1)
+            const returnType = header.slice(closingParenthesis + 1)
+                .replace(/use\s*\([^)]*\)/, '')
+                .trim()
+            replacement = `fn${args}${returnType ? ` ${returnType}` : ''} => ${expression}`
+        }
+
+        return editor.edit((edit: vscode.TextEditorEdit) => {
+            edit.replace(functionRange, replacement)
+        }, {undoStopBefore: true, undoStopAfter: true})
     }
 
     async extractToProperty() {
@@ -356,7 +379,7 @@ export default class Resolver {
         const {selections, document} = editor
         // @ts-expect-error ignore
         const topSelection = utils.sortSelections(selections)[0]
-        const activeLine = topSelection.active.line
+        const activeLine = topSelection.start.line
 
         try {
             const _methodsOrFunctions = parser.getMethodsOrFunctions(document.getText())
@@ -380,29 +403,35 @@ export default class Resolver {
             const isEndOfStatement = selectionTxt.endsWith(';')
             const extractionTxt = `${propertyName} = ${selectionTxt}${isEndOfStatement ? '' : ';\n'}`
 
-            // replace selections
-            for (const selection of utils.sortSelections(selections).reverse()) {
-                await editor.edit((edit: vscode.TextEditorEdit) => {
-                    edit.replace(selection, `${propertyName}${isEndOfStatement ? ';' : ''}`)
-                }, {undoStopBefore: false, undoStopAfter: false})
-            }
-
-            editor.selection = topSelection
-
-            // add property
-            await vscode.commands.executeCommand('cursorMove', {
-                to: 'prevBlankLine',
-            })
-
             editor = this.getEditor()
             let _insertLocation = editor.selection
             const _insertLocationLine = _insertLocation.active.line
+            const scope = this.getIntersectedScope(functionBody, topSelection.start.line, topSelection.end.line)
 
             let methodBodyLine
             let propertyContent
             let indentation
 
-            if (parser.hasIntersection(functionBody, _insertLocationLine)) {
+            if (scope) {
+                const scopeBodyStart = scope.body.children?.[0]?.loc.start || scope.body.loc.end
+                // @ts-expect-error ignore
+                _insertLocation = parser.getRangeFromLoc(
+                    {...scopeBodyStart, column: 0},
+                    {...scopeBodyStart, column: 0},
+                )
+                methodBodyLine = document.lineAt(scopeBodyStart.line - 1)
+                indentation = methodBodyLine.text.substring(0, methodBodyLine.firstNonWhitespaceCharacterIndex)
+                propertyContent = `${indentation}${extractionTxt}${extractionTxt.endsWith('\n') ? '' : '\n'}`
+            } else if (parser.hasIntersection(functionBody, _insertLocationLine)) {
+                // add property
+                editor.selection = topSelection
+                await vscode.commands.executeCommand('cursorMove', {
+                    to: 'prevBlankLine',
+                })
+
+                editor = this.getEditor()
+                _insertLocation = editor.selection
+                const insertLocationLine = _insertLocation.active.line
                 methodBodyLine = document.lineAt(_insertLocationLine + 1)
                 indentation = methodBodyLine.text.substring(0, methodBodyLine.firstNonWhitespaceCharacterIndex)
                 propertyContent = `${indentation}${extractionTxt}`
@@ -416,20 +445,47 @@ export default class Resolver {
                 editor.selection = topSelection
             }
 
-            return editor.edit(async(edit: vscode.TextEditorEdit) => {
-                edit.insert(_insertLocation.end, propertyContent)
-
-                if (propertyContent.endsWith('\n')) {
-                    await vscode.commands.executeCommand('cursorMove', {
-                        to: 'up',
-                    })
+            const sortedSelections = utils.sortSelections(selections).reverse()
+            const edited = await editor.edit((edit: vscode.TextEditorEdit) => {
+                for (const selection of sortedSelections) {
+                    edit.replace(selection, `${propertyName}${isEndOfStatement ? ';' : ''}`)
                 }
-            }, {undoStopBefore: false, undoStopAfter: false})
+
+                edit.insert(_insertLocation.end, propertyContent)
+            }, {undoStopBefore: true, undoStopAfter: true})
+
+            const cursorPosition = _insertLocation.start.translate(0, indentation.length)
+            editor.selection = new vscode.Selection(cursorPosition, cursorPosition)
+            return edited
         } catch (error) {
             utils.showMessage(error.message, true)
 
             // console.error(error);
         }
+    }
+
+    getIntersectedScope(node, startLine: number, endLine: number): any {
+        let intersectedScope
+
+        const visit = (value: any): void => {
+            if (!value || typeof value !== 'object') {
+                return
+            }
+
+            if (value.kind && value.loc) {
+                const containsSelection = value.loc.start.line - 1 <= startLine
+                    && value.loc.end.line - 1 >= endLine
+
+                if (containsSelection && value.kind === 'block' && value !== node.body) {
+                    intersectedScope = {body: value}
+                }
+            }
+
+            Object.values(value).forEach(visit)
+        }
+
+        visit(node)
+        return intersectedScope
     }
 
     async extractToClass() {

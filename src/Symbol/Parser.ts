@@ -43,17 +43,98 @@ export function getMethodsOrFunctions(content: string) {
     }
 }
 
+export function getFunctionLikeAtLines(content: string, startLine: number, endLine: number): any {
+    try {
+        const AST = buildASTFromContent(content)
+        let functionLike
+
+        const visit = (node: any): void => {
+            if (!node || typeof node !== 'object') {
+                return
+            }
+
+            if (['closure', 'arrowfunc'].includes(node.kind)
+                && node.loc.start.line - 1 <= startLine
+                && node.loc.end.line - 1 >= endLine) {
+                functionLike = node
+            }
+
+            Object.values(node).forEach(visit)
+        }
+
+        visit(AST)
+        return functionLike
+    } catch (error) {
+        // console.error(error);
+    }
+}
+
+export function getVariableNames(content: string): string[] {
+    try {
+        const AST = buildASTFromContent(`<?php\n${content}`)
+        const variables = new Set<string>()
+        const assigned = new Set<string>()
+
+        const visit = (node: any): void => {
+            if (!node || typeof node !== 'object') {
+                return
+            }
+
+            if (node.kind === 'variable') {
+                variables.add(node.name)
+            }
+
+            if (node.kind === 'assign' && node.left?.kind === 'variable') {
+                assigned.add(node.left.name)
+            }
+
+            Object.values(node).forEach(visit)
+        }
+
+        visit(AST)
+        return [...variables].filter((name) => !assigned.has(name) && name !== 'this')
+    } catch (error) {
+        // console.error(error);
+        return []
+    }
+}
+
+export function hasReturn(content: string): boolean {
+    try {
+        const AST = buildASTFromContent(`<?php\n${content}`)
+        let found = false
+
+        const visit = (node: any): void => {
+            if (!node || typeof node !== 'object' || found) {
+                return
+            }
+
+            if (node.kind === 'return') {
+                found = true
+                return
+            }
+
+            Object.values(node).forEach(visit)
+        }
+
+        visit(AST)
+        return found
+    } catch (error) {
+        // console.error(error);
+        return false
+    }
+}
+
 export function getMethods(_classAST: any): any[] | undefined {
     return _classAST?.body.filter((item: any) => item.kind == 'method')
 }
 
 export function getFunctions(AST) {
-    const filterExtra = AST?.children?.filter((item: any) => !new RegExp(/declare|usegroup|expressionstatement|function/).test(item.kind))
+    const filterExtra = AST?.children?.filter((item: any) => !/declare|usegroup|expressionstatement|function/.test(item.kind))
 
     return AST?.children
         ?.filter((item: any) => item.kind == 'function')
         .concat(getFunctionsLookup(filterExtra))
-        .flat()
         .filter((e) => e)
 }
 
@@ -146,13 +227,9 @@ function getClass(AST) {
 }
 
 function getFunctionsLookup(filterExtra) {
-    const list: any = []
-
-    for (const item of filterExtra) {
-        list.push(item.body?.children?.filter((item: any) => item.kind == 'function'))
-    }
-
-    return list
+    return filterExtra.flatMap((item) =>
+        item.body?.children?.filter((child: any) => child.kind == 'function') || [],
+    )
 }
 
 export function getRangeFromLoc(start: {line: number, column: number}, end: {line: number, column: number}): vscode.Range {

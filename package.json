@@ -1,11 +1,11 @@
 {
     "name": "vscode-php-refactor",
     "displayName": "PHP-Refactor",
-    "version": "0.2.7",
+    "version": "0.3.0",
     "publisher": "ctf0",
     "icon": "images/icon.png",
     "engines": {
-        "vscode": "^1.90.0"
+        "vscode": "^1.110.0"
     },
     "categories": [
         "Other"
@@ -37,8 +37,8 @@
                     "when": "editorLangId == php && editorHasSelection && !editorHasMultipleSelections"
                 },
                 {
-                    "command": "phprefactor.copy_to_function",
-                    "when": "editorLangId == php && editorHasSelection && !editorHasMultipleSelections"
+                    "command": "phprefactor.toggle_function_syntax",
+                    "when": "editorLangId == php && !editorHasSelection"
                 },
                 {
                     "command": "phprefactor.extract_to_property",
@@ -87,11 +87,6 @@
                     "group": "phprefactor"
                 },
                 {
-                    "command": "phprefactor.copy_to_function",
-                    "when": "editorLangId == php && editorHasSelection && !editorHasMultipleSelections",
-                    "group": "phprefactor"
-                },
-                {
                     "command": "phprefactor.extract_to_property",
                     "when": "editorLangId == php && editorHasSelection",
                     "group": "phprefactor"
@@ -122,8 +117,8 @@
                 "category": "PHP Refactor"
             },
             {
-                "command": "phprefactor.copy_to_function",
-                "title": "Copy To Method/Function",
+                "command": "phprefactor.toggle_function_syntax",
+                "title": "Toggle Function Short/Normal Syntax",
                 "category": "PHP Refactor"
             },
             {
@@ -235,20 +230,20 @@
     "devDependencies": {
         "@types/lodash.set": "^4.3.9",
         "@types/lodash.throttle": "^4.1.9",
-        "@types/node": "^24.2.1",
-        "@types/vscode": "^1.90.0",
-        "esbuild": "^0.25.9",
-        "typescript": "^5.9.2"
+        "@types/node": "^26.1.1",
+        "@types/vscode": "^1.110.0",
+        "esbuild": "^0.28.1",
+        "typescript": "^7.0.2"
     },
     "dependencies": {
         "escape-string-regexp": "^5.0.0",
-        "execa": "^9.6.0",
+        "execa": "^9.6.1",
         "fast-glob": "^3.3.3",
         "lodash.set": "^4.3.2",
         "lodash.throttle": "^4.1.1",
-        "php-parser": "^3.2.5",
-        "replace-in-file": "^8.3.0",
-        "strip-ansi": "^7.1.0"
+        "php-parser": "^3.7.0",
+        "replace-in-file": "^8.4.0",
+        "strip-ansi": "^7.2.0"
     },
     "extensionDependencies": [
         "bmewburn.vscode-intelephense-client",
