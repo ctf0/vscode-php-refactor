@@ -1,7 +1,7 @@
 {
     "name": "vscode-php-refactor",
     "displayName": "PHP-Refactor",
-    "version": "0.3.0",
+    "version": "0.3.1",
     "publisher": "ctf0",
     "icon": "images/icon.png",
     "engines": {
@@ -46,10 +46,6 @@
                 },
                 {
                     "command": "phprefactor.add_new_property",
-                    "when": "editorLangId == php && !editorHasSelection"
-                },
-                {
-                    "command": "phprefactor.add_phpdoc",
                     "when": "editorLangId == php && !editorHasSelection"
                 },
                 {
@@ -102,14 +98,6 @@
                 }
             ]
         },
-        "keybindings": [
-            {
-                "command": "phprefactor.add_phpdoc",
-                "key": "ctrl+enter",
-                "mac": "ctrl+enter",
-                "when": "editorLangId == php && !editorHasSelection"
-            }
-        ],
         "commands": [
             {
                 "command": "phprefactor.extract_to_function",
@@ -134,11 +122,6 @@
             {
                 "command": "phprefactor.add_new_property",
                 "title": "Add New Property",
-                "category": "Php Refactor"
-            },
-            {
-                "command": "phprefactor.add_phpdoc",
-                "title": "Add PhpDoc (alias to 'intelephense.phpdoc.add')",
                 "category": "Php Refactor"
             },
             {

@@ -2,7 +2,6 @@ import * as vscode from 'vscode'
 import type {ClassAST} from '../types'
 import * as utils from '../utils'
 import * as parser from './Parser'
-import * as symbolsAndReferences from './SymbolsAndReferences'
 
 export default class Resolver {
     config: vscode.WorkspaceConfiguration
@@ -787,28 +786,6 @@ export default class Resolver {
                     new vscode.Position(position.line, position.column),
                 )
             }
-        }
-    }
-
-    addPhpDocs(): Promise<unknown> {
-        const editor = this.getEditor()
-        const {document, selection} = editor
-
-        return this.insertPhpDocs(document, selection)
-    }
-
-    async insertPhpDocs(document: vscode.TextDocument, range: vscode.Range | undefined): Promise<unknown> {
-        const _docFixs: vscode.CodeAction[] = await vscode.commands.executeCommand(
-            'vscode.executeCodeActionProvider',
-            document.uri,
-            range,
-        )
-
-        const _docFix: vscode.CodeAction | undefined = _docFixs.find((fix: vscode.CodeAction) => fix.command?.command == 'intelephense.phpdoc.add')
-
-        if (_docFix) {
-            // @ts-expect-error ignore
-            return vscode.commands.executeCommand(_docFix.command?.command, ..._docFix.command?.arguments)
         }
     }
 
