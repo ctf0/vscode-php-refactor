@@ -3,16 +3,21 @@ import * as PhpParser from 'php-parser'
 import * as vscode from 'vscode'
 
 const Parser = new PhpParser.Engine({
-    parser: {
-        extractDoc: true,
-        suppressErrors: true,
+    parser : {
+        extractDoc     : true,
+        suppressErrors : true,
+        version        : '8.5',
     },
-    ast: {
-        withPositions: true,
+    ast : {
+        withPositions : true,
     },
 })
 
 function buildASTFromContent(content: string) {
+    return parseCode(content)
+}
+
+export function parseCode(content: string) {
     return Parser.parseCode(content, '*.php')
 }
 
@@ -43,6 +48,15 @@ export function getMethodsOrFunctions(content: string) {
     }
 }
 
+export function canAddNewPropertyAtLine(content: string, line: number): boolean {
+    const classAST = getClassASTFromContent(content)
+
+    return Boolean(
+        (classAST && hasIntersection(classAST, line))
+        || getMethodsOrFunctions(content)?.some((item) => hasIntersection(item, line)),
+    )
+}
+
 export function getFunctionLikeAtLines(content: string, startLine: number, endLine: number): any {
     try {
         const AST = buildASTFromContent(content)
@@ -54,8 +68,8 @@ export function getFunctionLikeAtLines(content: string, startLine: number, endLi
             }
 
             if (['closure', 'arrowfunc'].includes(node.kind)
-                && node.loc.start.line - 1 <= startLine
-                && node.loc.end.line - 1 >= endLine) {
+              && node.loc.start.line - 1 <= startLine
+              && node.loc.end.line - 1 >= endLine) {
                 functionLike = node
             }
 
@@ -63,6 +77,7 @@ export function getFunctionLikeAtLines(content: string, startLine: number, endLi
         }
 
         visit(AST)
+
         return functionLike
     } catch (error) {
         // console.error(error);
@@ -92,6 +107,7 @@ export function getVariableNames(content: string): string[] {
         }
 
         visit(AST)
+
         return [...variables].filter((name) => !assigned.has(name) && name !== 'this')
     } catch (error) {
         // console.error(error);
@@ -111,6 +127,7 @@ export function hasReturn(content: string): boolean {
 
             if (node.kind === 'return') {
                 found = true
+
                 return
             }
 
@@ -118,6 +135,7 @@ export function hasReturn(content: string): boolean {
         }
 
         visit(AST)
+
         return found
     } catch (error) {
         // console.error(error);
@@ -144,8 +162,8 @@ export function getConstructor(_classAST: any, getArgsOnly = false) {
     if (getArgsOnly) {
         return _const?.arguments.map((item: PhpParser.Parameter) =>
             Object.assign(item, {
-                leadingComments: _const.leadingComments,
-                visibility: flagsToVisibility(item.flags),
+                leadingComments : _const.leadingComments,
+                visibility      : flagsToVisibility(item.flags),
             }),
         )
     }
@@ -163,10 +181,10 @@ export function getClassScopeInsertLine(_classAST: any) {
         position = _properties[_properties.length - 1]
 
         return {
-            line: position.loc.end.line - 1,
-            column: position.loc.end.column,
-            addPrefixLine: true,
-            addSuffixLine: false,
+            line          : position.loc.end.line - 1,
+            column        : position.loc.end.column,
+            addPrefixLine : true,
+            addSuffixLine : false,
         }
     }
 
@@ -184,10 +202,10 @@ export function getClassScopeInsertLine(_classAST: any) {
         }
 
         return {
-            line: position.loc.start.line - 1,
-            column: position.loc.start.column,
-            addPrefixLine: false,
-            addSuffixLine: true,
+            line          : position.loc.start.line - 1,
+            column        : position.loc.start.column,
+            addPrefixLine : false,
+            addSuffixLine : true,
         }
     }
 
@@ -196,10 +214,10 @@ export function getClassScopeInsertLine(_classAST: any) {
     position = _classAST
 
     return {
-        line: position.loc.end.line - 1,
-        column: 0,
-        addPrefixLine: false,
-        addSuffixLine: true,
+        line          : position.loc.end.line - 1,
+        column        : 0,
+        addPrefixLine : false,
+        addSuffixLine : true,
     }
 }
 

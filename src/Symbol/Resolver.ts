@@ -4,10 +4,10 @@ import * as utils from '../utils'
 import * as parser from './Parser'
 
 export default class Resolver {
-    config: vscode.WorkspaceConfiguration
-    CLASS_AST: ClassAST | null = null
-    EDITOR: vscode.TextEditor | null = null
-    DEFAULT_INDENT: string
+    config         : vscode.WorkspaceConfiguration
+    CLASS_AST      : ClassAST | null = null
+    EDITOR         : vscode.TextEditor | null = null
+    DEFAULT_INDENT : string
 
     public constructor(config: vscode.WorkspaceConfiguration) {
         this.config = config
@@ -39,6 +39,7 @@ export default class Resolver {
 
         if (!this.CLASS_AST || this.CLASS_AST.kind !== 'class') {
             utils.showMessage(`only classes can have ${methodName}`, true)
+
             return
         }
 
@@ -68,8 +69,8 @@ export default class Resolver {
     }
 
     getArgumentInsertPosition(document: vscode.TextDocument, functionLike: any): {
-        position: {line: number; column: number}
-        prefix: string
+        position : {line: number, column: number}
+        prefix   : string
     } {
         const args = functionLike.arguments
 
@@ -78,11 +79,11 @@ export default class Resolver {
             const lastArg = args[args.length - 1]
 
             return {
-                position: {
-                    line: lastArg.loc.end.line - 1,
-                    column: lastArg.loc.end.column,
+                position : {
+                    line   : lastArg.loc.end.line - 1,
+                    column : lastArg.loc.end.column,
                 },
-                prefix: firstArg.loc.end.line === lastArg.loc.end.line ? ', ' : ',\n',
+                prefix : firstArg.loc.end.line === lastArg.loc.end.line ? ', ' : ',\n',
             }
         }
 
@@ -95,11 +96,11 @@ export default class Resolver {
         const position = document.positionAt(functionLike.loc.start.offset + functionText.indexOf('(') + 1)
 
         return {
-            position: {
-                line: position.line,
-                column: position.character,
+            position : {
+                line   : position.line,
+                column : position.character,
             },
-            prefix: '',
+            prefix : '',
         }
     }
 
@@ -113,7 +114,7 @@ export default class Resolver {
         let prefix = ''
         let suffix = ''
         const readOnly = this.config.showReadonly ? ' readonly' : ''
-        let snippet = `\${1|public,private,protected|}${readOnly} \${2:type} \$\${3:name}\${4: = \${5:'value'}}`
+        let snippet = `\${1|public,private,protected,abstract|}${readOnly} \${2:type} \$\${3:name}\${4: = \${5:'value'}}`
 
         const activeLine = selection.active.line
 
@@ -174,8 +175,8 @@ export default class Resolver {
                 snippet = '\$\${2:var}\${3: = \${4:\'value\'}}'
                 suffix = `;${this.getEditor().document.lineAt(activeLine).isEmptyOrWhitespace ? '' : '\n'}`
                 position = {
-                    line: selection.active.line,
-                    column: selection.active.character,
+                    line   : selection.active.line,
+                    column : selection.active.character,
                 }
             }
         }
@@ -224,7 +225,7 @@ export default class Resolver {
             const methodArguments = dependencies.map((name) => `$${name}`).join(', ')
 
             let methodName: any = await vscode.window.showInputBox({
-                placeHolder: 'function/method name',
+                placeHolder : 'function/method name',
             })
 
             if (!methodName) {
@@ -306,7 +307,10 @@ export default class Resolver {
         let closingParenthesis = -1
 
         for (let i = openingParenthesis; i < header.length; i++) {
-            if (header[i] === '(') depth++
+            if (header[i] === '(') {
+                depth++
+            }
+
             if (header[i] === ')' && --depth === 0) {
                 closingParenthesis = i
                 break
@@ -328,6 +332,7 @@ export default class Resolver {
             const parameters = new Set(functionLike.arguments.map((argument) => argument.name.name))
             const superglobals = new Set(['this', 'GLOBALS', '_SERVER', '_GET', '_POST', '_FILES', '_COOKIE', '_SESSION', '_REQUEST', '_ENV', 'http_response_header', 'argc', 'argv'])
             const dependencies = new Set<string>()
+
             const collectVariables = (node: any): void => {
                 if (!node || typeof node !== 'object') {
                     return
@@ -343,8 +348,8 @@ export default class Resolver {
             collectVariables(functionLike.body)
             const useClause = dependencies.size ? ` use (${[...dependencies].join(', ')})` : ''
             replacement = `function${args}${useClause}${returnType ? ` ${returnType}` : ''} {\n`
-                + `${indentation}${this.DEFAULT_INDENT}return ${expression};\n`
-                + `${indentation}}`
+              + `${indentation}${this.DEFAULT_INDENT}return ${expression};\n`
+              + `${indentation}}`
         } else {
             const bodyChildren = functionLike.body.children || []
             const returnStatement = bodyChildren.length === 1 && bodyChildren[0].kind === 'return'
@@ -389,7 +394,7 @@ export default class Resolver {
             const selectionTxt = this.checkStartWithChar(document, topSelection)
 
             let propertyName: any = await vscode.window.showInputBox({
-                placeHolder: 'property name',
+                placeHolder : 'property name',
             })
 
             if (!propertyName) {
@@ -425,7 +430,7 @@ export default class Resolver {
                 // add property
                 editor.selection = topSelection
                 await vscode.commands.executeCommand('cursorMove', {
-                    to: 'prevBlankLine',
+                    to : 'prevBlankLine',
                 })
 
                 editor = this.getEditor()
@@ -455,6 +460,7 @@ export default class Resolver {
 
             const cursorPosition = _insertLocation.start.translate(0, indentation.length)
             editor.selection = new vscode.Selection(cursorPosition, cursorPosition)
+
             return edited
         } catch (error) {
             utils.showMessage(error.message, true)
@@ -473,7 +479,7 @@ export default class Resolver {
 
             if (value.kind && value.loc) {
                 const containsSelection = value.loc.start.line - 1 <= startLine
-                    && value.loc.end.line - 1 >= endLine
+                  && value.loc.end.line - 1 >= endLine
 
                 if (containsSelection && value.kind === 'block' && value !== node.body) {
                     intersectedScope = {body: value}
@@ -484,6 +490,7 @@ export default class Resolver {
         }
 
         visit(node)
+
         return intersectedScope
     }
 
@@ -506,12 +513,12 @@ export default class Resolver {
 
             // Show directory picker
             const selectedDirectory = await vscode.window.showOpenDialog({
-                canSelectFiles: false,
-                canSelectFolders: true,
-                canSelectMany: false,
-                openLabel: 'Select Directory',
-                title: 'Select directory for new class',
-                defaultUri: vscode.workspace.workspaceFolders?.[0]?.uri,
+                canSelectFiles   : false,
+                canSelectFolders : true,
+                canSelectMany    : false,
+                openLabel        : 'Select Directory',
+                title            : 'Select directory for new class',
+                defaultUri       : vscode.workspace.workspaceFolders?.[0]?.uri,
             })
 
             if (!selectedDirectory || selectedDirectory.length === 0) {
@@ -522,8 +529,8 @@ export default class Resolver {
 
             // Show input for class name
             const className: any = await vscode.window.showInputBox({
-                placeHolder: 'Class name (e.g., MyNewClass)',
-                validateInput: (value: string) => {
+                placeHolder   : 'Class name (e.g., MyNewClass)',
+                validateInput : (value: string) => {
                     if (!value || value.trim().length === 0) {
                         return 'Class name cannot be empty'
                     }
@@ -546,6 +553,7 @@ export default class Resolver {
             // Check if file already exists
             try {
                 await vscode.workspace.fs.stat(vscode.Uri.file(newFilePath))
+
                 return utils.showMessage('file already exists', true)
             } catch {
                 // File doesn't exist, which is what we want

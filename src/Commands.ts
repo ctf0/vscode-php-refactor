@@ -8,8 +8,8 @@ export async function generateNamespaceForDirFiles(uri: vscode.Uri) {
     const dirPath = uri.fsPath
     const noNSExclude = utils.noNamespaceList
     let phpFiles: any = await glob(`**/*${utils.EXT}`, {
-        cwd: dirPath,
-        ignore: utils.filesExcludeGlob,
+        cwd    : dirPath,
+        ignore : utils.filesExcludeGlob,
     })
 
     if (!phpFiles.length) {
@@ -17,19 +17,19 @@ export async function generateNamespaceForDirFiles(uri: vscode.Uri) {
     }
 
     await vscode.window.withProgress({
-        location: vscode.ProgressLocation.Notification,
-        cancellable: false,
-        title: 'Updating Please Wait',
+        location    : vscode.ProgressLocation.Notification,
+        cancellable : false,
+        title       : 'Updating Please Wait',
     }, async(progress: vscode.Progress<{message?: string, increment?: number}>) => {
         phpFiles = phpFiles.map((file) => `${dirPath}/${file}`)
 
         progress.report({
-            message: `Updating files in "${dirPath}", please wait`,
+            message : `Updating files in "${dirPath}", please wait`,
         })
 
         const results = await replaceInFile({
-            files: phpFiles,
-            processor: async(input: string, file) => {
+            files     : phpFiles,
+            processor : async(input: string, file) => {
                 const ns: string | undefined = await utils.getNamespaceFromPath(file)
 
                 if (ns) {
@@ -57,7 +57,7 @@ export async function generateNamespaceForDirFiles(uri: vscode.Uri) {
         }
 
         progress.report({
-            increment: 100,
+            increment : 100,
         })
     })
 }

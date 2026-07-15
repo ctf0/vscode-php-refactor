@@ -1,7 +1,7 @@
 {
     "name": "vscode-php-refactor",
     "displayName": "PHP-Refactor",
-    "version": "0.3.1",
+    "version": "0.3.2",
     "publisher": "ctf0",
     "icon": "images/icon.png",
     "engines": {
@@ -15,7 +15,8 @@
         "refactor"
     ],
     "activationEvents": [
-        "onLanguage:php"
+        "onLanguage:php",
+        "workspaceContains:**/*.php"
     ],
     "repository": "https://github.com/ctf0/vscode-php-refactor",
     "main": "./out/main",
@@ -212,7 +213,6 @@
     },
     "devDependencies": {
         "@types/lodash.set": "^4.3.9",
-        "@types/lodash.throttle": "^4.1.9",
         "@types/node": "^26.1.1",
         "@types/vscode": "^1.110.0",
         "esbuild": "^0.28.1",
@@ -223,13 +223,12 @@
         "execa": "^9.6.1",
         "fast-glob": "^3.3.3",
         "lodash.set": "^4.3.2",
-        "lodash.throttle": "^4.1.1",
         "php-parser": "^3.7.0",
         "replace-in-file": "^8.4.0",
         "strip-ansi": "^7.2.0"
     },
     "extensionDependencies": [
-        "bmewburn.vscode-intelephense-client",
-        "ctf0.php-namespace-resolver"
+        "ctf0.php-namespace-resolver",
+        "ctf0.php-array-symbols"
     ]
 }

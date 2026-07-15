@@ -1,38 +1,31 @@
-import * as vscode from 'vscode'
+import * as parser from './Parser'
 
-export function extractMethodOrFunctionsSymbols(symbols: vscode.DocumentSymbol[]): vscode.DocumentSymbol[] | undefined {
-    let methods = extractClassSymbols(symbols)?.filter((item) => item.kind === vscode.SymbolKind.Method)
-
-    if (!methods?.length) {
-        methods = symbols.filter((symbol: vscode.DocumentSymbol) => symbol.kind === vscode.SymbolKind.Function)
-    }
-
-    return methods
+export function extractMethodOrFunctionsSymbols(content: string): any[] | undefined {
+    return parser.getMethodsOrFunctions(content)
 }
 
-export function extractClassSymbols(symbols: vscode.DocumentSymbol[]): vscode.DocumentSymbol[] | undefined {
-    return symbols.find((symbol: vscode.DocumentSymbol) => symbol.kind === vscode.SymbolKind.Class)?.children
+export function extractClassSymbols(content: string): any[] | undefined {
+    return parser.getClassASTFromContent(content)?.body
 }
 
-export function filterMagicSymbols(_classSymbols: vscode.DocumentSymbol[], methodNames: string[]): string[] {
+export function filterMagicSymbols(_classSymbols: any[] | undefined, methodNames: string[]): string[] {
     const current = _classSymbols
-        .filter((symbol: vscode.DocumentSymbol) => symbol.kind === vscode.SymbolKind.Method || symbol.kind === vscode.SymbolKind.Constructor)
-        .map((symbol: vscode.DocumentSymbol) => symbol.name)
+        ?.filter((symbol) => symbol.kind === 'method')
+        .map((symbol) => symbol.name.name) || []
 
     return methodNames.filter((name) => current.indexOf(name) === -1)
 }
 
-export function extractPropSymbols(_classSymbols: vscode.DocumentSymbol[] | undefined): vscode.DocumentSymbol[] | undefined {
-    return _classSymbols?.filter((item) => item.kind === vscode.SymbolKind.Property)
+export function extractPropSymbols(_classSymbols: any[] | undefined): any[] | undefined {
+    return _classSymbols
+        ?.filter((item) => item.kind === 'propertystatement')
+        .flatMap((item) => item.properties)
 }
 
-export function getFileSymbols(uri: vscode.Uri) {
-    return vscode.commands.executeCommand('vscode.executeDocumentSymbolProvider', uri)
-}
-
-export function hasStartOrEndIntersection(selections, DocumentSymbol): any {
-    return DocumentSymbol.find((item) => {
-        if (selections.find((sel) => item.range.start.line === sel.start.line || item.range.end.line === sel.end.line)) {
+export function hasStartOrEndIntersection(selections, symbols: any[]): any {
+    return symbols.find((item) => {
+        if (selections.find((selection) => item.loc.start.line - 1 === selection.start.line
+          || item.loc.end.line - 1 === selection.end.line)) {
             return item
         }
     })

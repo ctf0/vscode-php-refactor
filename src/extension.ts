@@ -5,10 +5,21 @@ import CodeAction from './Providers/CodeAction'
 import Resolver from './Symbol/Resolver'
 import * as utils from './utils'
 
+type ArraySymbolProvider = {
+    getSymbolKeyAtLine(document: vscode.TextDocument, line: number): string | undefined
+}
+
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     await utils.NsExtensionProviderInit()
     utils.setConfig()
 
+    const arraySymbolsExtension = vscode.extensions.getExtension('ctf0.php-array-symbols')
+
+    if (!arraySymbolsExtension) {
+        throw new Error('Depends on \'ctf0.php-array-symbols\' extension')
+    }
+
+    const arraySymbolProvider = await arraySymbolsExtension.activate() as ArraySymbolProvider
     let _refactor = new Resolver(utils.config)
 
     context.subscriptions.push(
@@ -30,10 +41,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         // new
         vscode.commands.registerCommand(`${utils.PACKAGE_CMND_NAME}.add_magic`, async(arg: string) => await _refactor.addMagicMethod(arg)),
         vscode.commands.registerCommand(`${utils.PACKAGE_CMND_NAME}.add_new_property`, async() => await _refactor.addNewProperty()),
+        vscode.commands.registerCommand(`${utils.PACKAGE_CMND_NAME}.copy_array_key`, async(key: string) => {
+            await vscode.env.clipboard.writeText(key)
+            utils.showMessage(`"${key}" copied`)
+        }),
         // other
         vscode.commands.registerCommand(`${utils.PACKAGE_CMND_NAME}.generate_namespace`, async(uri: vscode.Uri) => await cmnds.generateNamespaceForDirFiles(uri)),
         // providers
-        vscode.languages.registerCodeActionsProvider('php', new CodeAction()),
+        vscode.languages.registerCodeActionsProvider('php', new CodeAction(arraySymbolProvider)),
         // events
         vscode.workspace.onDidRenameFiles(async(event: vscode.FileRenameEvent) => await updateFileReferences(event)),
     )

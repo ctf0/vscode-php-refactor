@@ -86,13 +86,13 @@ export async function getFileNameAndNamespace(fileToPath: string, fileFromPath: 
     const from_ns = await getNamespaceFromPath(fileFromPath)
 
     return {
-        _from: {
-            name: from_fn,
-            namespace: from_ns ? (getFQNOnly(from_ns) + '\\' + from_fn) : '',
+        _from : {
+            name      : from_fn,
+            namespace : from_ns ? (getFQNOnly(from_ns) + '\\' + from_fn) : '',
         },
-        _to: {
-            name: to_fn,
-            namespace: to_ns ? (getFQNOnly(to_ns) + '\\' + to_fn) : '',
+        _to : {
+            name      : to_fn,
+            namespace : to_ns ? (getFQNOnly(to_ns) + '\\' + to_fn) : '',
         },
     }
 }
@@ -124,7 +124,7 @@ export async function runComposer(uri?: vscode.Uri): Promise<void> {
             const cwd = getCWD(uri?.fsPath)
             const {stderr, stdout} = await execa(composerCmnd, {
                 cwd,
-                shell: vscode.env.shell,
+                shell : vscode.env.shell,
             })
 
             if (stderr) {
