@@ -409,7 +409,6 @@ export default class Resolver {
 
             editor = this.getEditor()
             let _insertLocation = editor.selection
-            const _insertLocationLine = _insertLocation.active.line
             const scope = this.getIntersectedScope(functionBody, topSelection.start.line, topSelection.end.line)
 
             let methodBodyLine
@@ -426,19 +425,6 @@ export default class Resolver {
                 methodBodyLine = document.lineAt(scopeBodyStart.line - 1)
                 indentation = methodBodyLine.text.substring(0, methodBodyLine.firstNonWhitespaceCharacterIndex)
                 propertyContent = `${indentation}${extractionTxt}${extractionTxt.endsWith('\n') ? '' : '\n'}`
-            } else if (parser.hasIntersection(functionBody, _insertLocationLine)) {
-                // add property
-                editor.selection = topSelection
-                await vscode.commands.executeCommand('cursorMove', {
-                    to : 'prevBlankLine',
-                })
-
-                editor = this.getEditor()
-                _insertLocation = editor.selection
-                const insertLocationLine = _insertLocation.active.line
-                methodBodyLine = document.lineAt(_insertLocationLine + 1)
-                indentation = methodBodyLine.text.substring(0, methodBodyLine.firstNonWhitespaceCharacterIndex)
-                propertyContent = `${indentation}${extractionTxt}`
             } else {
                 const _currentMethodStart = functionBody.body.children[0].loc.start
                 // @ts-expect-error ignore
@@ -470,28 +456,28 @@ export default class Resolver {
     }
 
     getIntersectedScope(node, startLine: number, endLine: number): any {
-        let intersectedScope
-
-        const visit = (value: any): void => {
+        const visit = (value: any, insideArrowFunction = false): any => {
             if (!value || typeof value !== 'object') {
                 return
             }
 
-            if (value.kind && value.loc) {
-                const containsSelection = value.loc.start.line - 1 <= startLine
-                  && value.loc.end.line - 1 >= endLine
+            const isArrowFunction = value.kind === 'arrowfunc'
+            const isScope = !insideArrowFunction && value.kind === 'block' && value.loc && value !== node.body
+              && value.loc.start.line - 1 <= startLine
+              && value.loc.end.line - 1 >= endLine
 
-                if (containsSelection && value.kind === 'block' && value !== node.body) {
-                    intersectedScope = {body: value}
+            for (const child of Object.values(value)) {
+                const scope = visit(child, insideArrowFunction || isArrowFunction)
+
+                if (scope) {
+                    return scope
                 }
             }
 
-            Object.values(value).forEach(visit)
+            return isScope ? {body: value} : undefined
         }
 
-        visit(node)
-
-        return intersectedScope
+        return visit(node)
     }
 
     async extractToClass() {
