@@ -8,16 +8,36 @@ import * as utils from '../utils'
 const NAMESPACE_REG = /^namespace/m
 const ERROR_MSG = 'nothing changed as we cant correctly update references'
 let madeChanges = false
+let pendingRenameExcludedFiles = new Set<string>()
+
+export function setRenameExcludedFiles(files: readonly string[]): void {
+    pendingRenameExcludedFiles = new Set(files)
+}
+
+function consumeRenameExcludedFiles(event: vscode.FileRenameEvent): string[] {
+    const excluded = new Set(pendingRenameExcludedFiles)
+    pendingRenameExcludedFiles = new Set()
+
+    for (const file of event.files) {
+        if (excluded.has(file.oldUri.fsPath)) {
+            excluded.add(file.newUri.fsPath)
+        }
+    }
+
+    return [...excluded]
+}
 
 export default async function updateFileReferences(event: vscode.FileRenameEvent): Promise<boolean> {
+    const excludedFiles = consumeRenameExcludedFiles(event)
+
     if (!utils.getConfig('updateFileAndReferenceOnRename') as boolean) {
         return false
     }
 
     await vscode.window.withProgress({
-        location: vscode.ProgressLocation.Notification,
-        cancellable: false,
-        title: 'Updating Please Wait',
+        location    : vscode.ProgressLocation.Notification,
+        cancellable : false,
+        title       : 'Updating Please Wait',
     }, async(progress: vscode.Progress<{message?: string, increment?: number}>) => {
         try {
             for (const file of event.files) {
@@ -26,7 +46,7 @@ export default async function updateFileReferences(event: vscode.FileRenameEvent
                 const _scheme = await fs.stat(to)
 
                 if (_scheme.isDirectory()) {
-                    await replaceFromNamespaceForDirs(to, from, progress)
+                    await replaceFromNamespaceForDirs(to, from, progress, excludedFiles)
                 } else {
                     // ignore if not php
                     if (utils.getFileExtFromPath(from) !== utils.EXT || utils.getFileExtFromPath(to) !== utils.EXT) {
@@ -50,9 +70,8 @@ export default async function updateFileReferences(event: vscode.FileRenameEvent
                     }
                     // new file name
                     else {
-                        if (await updateFileTypeNameByFileName(to, _getFileNameAndNamespace, progress)) {
-                            await updateFileTypeContentEverywhere(to, _getFileNameAndNamespace, progress)
-                        }
+                        await updateFileTypeNameByFileName(to, _getFileNameAndNamespace, progress, excludedFiles)
+                        await updateFileTypeContentEverywhere(to, _getFileNameAndNamespace, progress, excludedFiles)
                     }
                 }
             }
@@ -76,17 +95,18 @@ async function replaceFromNamespaceForDirs(
     dirToPath: string,
     dirFromPath: string,
     progress: vscode.Progress<{message?: string, increment?: number}>,
+    excludedFiles: readonly string[],
 ) {
     const checkForPhpFiles = await glob(`**/*${utils.EXT}`, {
-        cwd: dirToPath,
-        ignore: utils.filesExcludeGlob,
+        cwd    : dirToPath,
+        ignore : utils.filesExcludeGlob,
     })
 
     if (!checkForPhpFiles.length) {
         return
     }
 
-    return updateEverywhereForDirs(dirToPath, dirFromPath, progress)
+    return updateEverywhereForDirs(dirToPath, dirFromPath, progress, excludedFiles)
 }
 
 /* Files Move --------------------------------------------------------------- */
@@ -95,12 +115,12 @@ async function updateFileNamespace(fileToPath: string, progress: vscode.Progress
     const toNamespace = await utils.getNamespaceFromPath(fileToPath)
 
     progress.report({
-        message: `Updating file namespace to "${toNamespace}"`,
+        message : `Updating file namespace to "${toNamespace}"`,
     })
 
     const results: any = await replaceInFile({
-        files: fileToPath,
-        processor: (input: string) => {
+        files     : fileToPath,
+        processor : (input: string) => {
             // if it has a namespace then its probably a structured file
             if (input.match(NAMESPACE_REG)) {
                 input = input.replace(new RegExp(/(\n)?^namespace.*(\n)?/, 'm'), toNamespace || '')
@@ -125,16 +145,21 @@ async function updateFileTypeNameByFileName(
     fileToPath: string,
     {_from, _to}: {_from: {name: string, namespace: string}, _to: {name: string, namespace: string}},
     progress: vscode.Progress<{message?: string, increment?: number}>,
+    excludedFiles: readonly string[],
 ) {
+    if (excludedFiles.includes(fileToPath)) {
+        return false
+    }
+
     const TYPES = '^((?:(?:final|abstract) +)?(?:(?:readonly) +)?(?:class|interface|enum|trait) +)'
 
     progress.report({
-        message: `Updating file type name from "${_from.name}" to "${_to.name}"`,
+        message : `Updating file type name from "${_from.name}" to "${_to.name}"`,
     })
 
     const results: any = await replaceInFile({
-        files: fileToPath,
-        processor: (input: string) => {
+        files     : fileToPath,
+        processor : (input: string) => {
             // update only the type name & nothing else
             const match = input.match(new RegExp(`${TYPES}(${escapeStringRegexp(_from.name)})`, 'm'))
 
@@ -159,6 +184,7 @@ async function updateFileTypeContentEverywhere(
     fileToPath: string,
     {_to, _from}: {_to: {name: string, namespace: string}, _from: {name: string, namespace: string}},
     progress: vscode.Progress<{message?: string, increment?: number}>,
+    excludedFiles: readonly string[],
 ) {
     const fromClass = _from.name
     const toClass = _to.name
@@ -171,14 +197,14 @@ async function updateFileTypeContentEverywhere(
     }
 
     progress.report({
-        message: `Updating references from "${fromNamespace}" to "${toNamespace}"`,
+        message : `Updating references from "${fromNamespace}" to "${toNamespace}"`,
     })
 
     const escaped = escapeStringRegexp(fromNamespace)
 
     const results = await replaceInFile({
-        files: await utils.getFilesList(fileToPath),
-        processor: (input: string) => {
+        files     : await utils.getFilesList(fileToPath, excludedFiles),
+        processor : (input: string) => {
             input = input
                 // change the namespace if it has an alias
                 .replace(new RegExp(`(?<=^use )${escaped}(?= as)`, 'gm'), toNamespace)
@@ -212,6 +238,7 @@ async function updateEverywhereForDirs(
     dirToPath: string,
     dirFromPath: string,
     progress: vscode.Progress<{message?: string, increment?: number}>,
+    excludedFiles: readonly string[],
 ) {
     const fromNamespace = utils.getFQNOnly(await utils.getNamespaceFromPath(dirFromPath + `/ph${utils.EXT}`))
     const toNamespace = utils.getFQNOnly(await utils.getNamespaceFromPath(dirToPath + `/ph${utils.EXT}`))
@@ -231,12 +258,12 @@ async function updateEverywhereForDirs(
     }
 
     progress.report({
-        message: `Updating references from "${fromNamespace}" to "${toNamespace}"`,
+        message : `Updating references from "${fromNamespace}" to "${toNamespace}"`,
     })
 
     const results = await replaceInFile({
-        files: await utils.getFilesList(dirToPath),
-        processor: (input: string) => input.replace(new RegExp(escapeStringRegexp(fromNamespace), 'g'), toNamespace),
+        files     : await utils.getFilesList(dirToPath, excludedFiles),
+        processor : (input: string) => input.replace(new RegExp(escapeStringRegexp(fromNamespace), 'g'), toNamespace),
     })
 
     if (results.some((item) => item.hasChanged)) {
@@ -248,18 +275,19 @@ async function updateOldNSPathEverywhere(
     fileToPath: string,
     {_to, _from}: {_to: {name: string, namespace: string}, _from: {name: string, namespace: string}},
     progress: vscode.Progress<{message?: string, increment?: number}>,
+    excludedFiles: readonly string[],
 ) {
     const fromNamespace = _from.namespace
     const toNamespace = _to.namespace
 
     progress.report({
-        message: `Updating references from "${fromNamespace}" to "${toNamespace}"`,
+        message : `Updating references from "${fromNamespace}" to "${toNamespace}"`,
     })
 
     // moved from/to namespace
     const results = await replaceInFile({
-        files: await utils.getFilesList(fileToPath),
-        processor: (input: string) => input.replace(new RegExp(escapeStringRegexp(fromNamespace), 'g'), toNamespace),
+        files     : await utils.getFilesList(fileToPath, excludedFiles),
+        processor : (input: string) => input.replace(new RegExp(escapeStringRegexp(fromNamespace), 'g'), toNamespace),
     })
 
     if (results.some((item) => item.hasChanged)) {

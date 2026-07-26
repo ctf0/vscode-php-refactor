@@ -109,8 +109,11 @@ export function getCWD(path: string): string | undefined {
     return vscode.workspace.getWorkspaceFolder(vscode.Uri.file(path))?.uri.fsPath
 }
 
-export function getFilesList(path: string): Promise<string | string[]> {
-    return glob(`${getCWD(path)}/**/*${EXT}`, {ignore: filesExcludeGlob})
+export async function getFilesList(filePath: string, excludedFiles: readonly string[] = []): Promise<string[]> {
+    const excluded = new Set(excludedFiles.map((file) => path.resolve(file)))
+    const files = await glob(`${getCWD(filePath)}/**/*${EXT}`, {ignore: filesExcludeGlob})
+
+    return files.filter((file) => !excluded.has(path.resolve(file)))
 }
 
 export async function runComposer(uri?: vscode.Uri): Promise<void> {

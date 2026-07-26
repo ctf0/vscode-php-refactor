@@ -75,3 +75,7 @@
 ## 0.2.7
 
 - hide the progress once everything is done
+
+## 0.3.4
+
+- dont race with current provider on renaming, instead act as a second layer for whatever falls out of the original provider scope

@@ -1,7 +1,7 @@
 {
     "name": "vscode-php-refactor",
     "displayName": "PHP-Refactor",
-    "version": "0.3.3",
+    "version": "0.3.4",
     "publisher": "ctf0",
     "icon": "images/icon.png",
     "engines": {
@@ -199,7 +199,7 @@
                     },
                     "minItems": 1,
                     "uniqueItems": true,
-                    "markdownDescription": "magic methods list\n`[\n__construct,\n__destruct,\n__call,\n__callStatic,\n__get,\n__set,\n__isset,\n__unset,\n__sleep,\n__wakeup,\n__serialize,\n__unserialize,\n__toString,\n__invoke,\n__set_state,\n__clone,\n__debugInfo\n]`"
+                    "markdownDescription": "magic methods list:\n\n`__construct,\n__destruct,\n__call,\n__callStatic,\n__get,\n__set,\n__isset,\n__unset,\n__sleep,\n__wakeup,\n__serialize,\n__unserialize,\n__toString,\n__invoke,\n__set_state,\n__clone,\n__debugInfo`"
                 }
             }
         }

@@ -2,6 +2,7 @@ import * as vscode from 'vscode'
 import * as cmnds from './Commands'
 import updateFileReferences from './Listeners/FileReferenceUpdate'
 import CodeAction from './Providers/CodeAction'
+import {registerRenameProvider} from './Providers/Rename'
 import Resolver from './Symbol/Resolver'
 import * as utils from './utils'
 
@@ -49,6 +50,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         vscode.commands.registerCommand(`${utils.PACKAGE_CMND_NAME}.generate_namespace`, async(uri: vscode.Uri) => await cmnds.generateNamespaceForDirFiles(uri)),
         // providers
         vscode.languages.registerCodeActionsProvider('php', new CodeAction(arraySymbolProvider)),
+        registerRenameProvider(),
         // events
         vscode.workspace.onDidRenameFiles(async(event: vscode.FileRenameEvent) => await updateFileReferences(event)),
     )
