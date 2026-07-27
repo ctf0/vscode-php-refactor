@@ -39,9 +39,16 @@ export function getMethodsOrFunctions(content: string) {
         const _class = getClassASTFromContent(content)
 
         if (_class) {
-            return getMethods(_class)
+            const methods = getMethods(_class) ?? []
+            const closures = getAllClosures(_class) ?? []
+
+            return [...closures, ...methods]
         } else {
-            return getFunctions(buildASTFromContent(content))
+            const AST = buildASTFromContent(content)
+            const funcs = getFunctions(AST) ?? []
+            const closures = getAllClosures(AST) ?? []
+
+            return [...closures, ...funcs]
         }
     } catch (error) {
         // console.error(error);
@@ -145,6 +152,34 @@ export function hasReturn(content: string): boolean {
 
 export function getMethods(_classAST: any): any[] | undefined {
     return _classAST?.body.filter((item: any) => item.kind == 'method')
+}
+
+export function getAllClosures(AST: any): any[] {
+    const closures: any[] = []
+
+    const visit = (node: any): void => {
+        if (!node || typeof node !== 'object') {
+            return
+        }
+
+        if (node.kind === 'closure') {
+            closures.push(node)
+        }
+
+        Object.values(node).forEach(visit)
+    }
+
+    visit(AST)
+
+    // Innermost (smallest range) first so Array.find prefers the most specific match
+    closures.sort((a, b) => {
+        const aSize = a.loc.end.offset - a.loc.start.offset
+        const bSize = b.loc.end.offset - b.loc.start.offset
+
+        return aSize - bSize
+    })
+
+    return closures
 }
 
 export function getFunctions(AST) {
@@ -276,7 +311,7 @@ function flagsToVisibility(flags: number): string {
 }
 
 export function hasStartOrEndIntersection(symbol, selection): boolean {
-    return symbol.loc.start.line === selection.start.line || symbol.loc.end.line === selection.end.line
+    return symbol.loc.start.line - 1 === selection.start.line || symbol.loc.end.line - 1 === selection.end.line
 }
 
 export function hasIntersection(symbol, lineNumber): boolean {

@@ -104,6 +104,35 @@ export default class Resolver {
         }
     }
 
+    private resolveClassScopeIndentation(position: {addPrefixLine: boolean, addSuffixLine: boolean, column: number}): {prefix: string, suffix: string} {
+        let prefix = position.addPrefixLine ? '\n\n' : '\n'
+        let suffix = position.addSuffixLine ? ';\n\n' : ';'
+
+        if (position.column == 0) {
+            prefix = this.DEFAULT_INDENT
+            suffix = position.addSuffixLine ? ';\n' : ';'
+        }
+
+        if (position.column == this.DEFAULT_INDENT.length) {
+            prefix = ''
+        }
+
+        return {prefix, suffix}
+    }
+
+    private resolveFreeFormPosition(selection: vscode.Selection, activeLine: number): {
+        snippet : string, position : {line: number, column: number}, suffix : string
+    } {
+        return {
+            snippet  : '\$\${2:var}\${3: = \${4:\'value\'}}',
+            suffix   : `;${this.getEditor().document.lineAt(activeLine).isEmptyOrWhitespace ? '' : '\n'}`,
+            position : {
+                line   : selection.active.line,
+                column : selection.active.character,
+            },
+        }
+    }
+
     addNewProperty(): Thenable<any> | undefined {
         this.setEditorAndAST()
 
@@ -118,34 +147,31 @@ export default class Resolver {
 
         const activeLine = selection.active.line
 
-        // constructor
-        const _const = parser.getConstructor(this.CLASS_AST)
-        const insideConstructorBody = _const?.loc.start.line - 1 <= activeLine && _const?.loc.end.line - 1 >= activeLine
+        const constructorMethod = parser.getConstructor(this.CLASS_AST)
+        const insideConstructorBody = constructorMethod?.loc.start.line - 1 <= activeLine && constructorMethod?.loc.end.line - 1 >= activeLine
 
-        if (_const && insideConstructorBody) {
-            const insert = this.getArgumentInsertPosition(document, _const)
+        if (constructorMethod && insideConstructorBody) {
+            const insert = this.getArgumentInsertPosition(document, constructorMethod)
             position = insert.position
             prefix = insert.prefix
         }
 
-        const _methodsOrFunctions = parser.getMethodsOrFunctions(this.getEditor().document.getText())
+        const methodsOrFunctions = parser.getMethodsOrFunctions(this.getEditor().document.getText())
 
-        // method
-        const _methods = _methodsOrFunctions.filter((item) => item.kind == 'method')
-        const insideMethodBody = _methods?.find((method) => method.loc.start.line - 1 <= activeLine && method.loc.end.line - 1 >= activeLine)
+        const methods = methodsOrFunctions.filter((item) => item.kind == 'method')
+        const insideMethodBody = methods?.find((method) => method.loc.start.line - 1 <= activeLine && method.loc.end.line - 1 >= activeLine)
 
-        if (_methods && insideMethodBody && !insideConstructorBody) {
+        if (methods && insideMethodBody && !insideConstructorBody) {
             snippet = '\${1:type} \$\${2:var}\${3: = \${4:\'value\'}}'
             const insert = this.getArgumentInsertPosition(document, insideMethodBody)
             position = insert.position
             prefix = insert.prefix
         }
 
-        // function
-        const _functions = _methodsOrFunctions.filter((item) => item.kind == 'function')
-        const insideFunctionBody = _functions?.find((method) => method.loc.start.line - 1 <= activeLine && method.loc.end.line - 1 >= activeLine)
+        const functions = methodsOrFunctions.filter((item) => item.kind == 'function')
+        const insideFunctionBody = functions?.find((method) => method.loc.start.line - 1 <= activeLine && method.loc.end.line - 1 >= activeLine)
 
-        if (_functions && insideFunctionBody) {
+        if (functions && insideFunctionBody) {
             snippet = '\${1:type} \$\${2:var}\${3: = \${4:\'value\'}}'
             const insert = this.getArgumentInsertPosition(document, insideFunctionBody)
             position = insert.position
@@ -154,30 +180,15 @@ export default class Resolver {
 
         if (!insideConstructorBody && !insideMethodBody && !insideFunctionBody) {
             if (this.CLASS_AST) {
-                try {
-                    position = parser.getClassScopeInsertLine(this.CLASS_AST)
-
-                    prefix = position.addPrefixLine ? '\n\n' : '\n'
-                    suffix = position.addSuffixLine ? ';\n\n' : ';'
-
-                    if (position.column == 0) {
-                        prefix = this.DEFAULT_INDENT
-                        suffix = position.addSuffixLine ? ';\n' : ';'
-                    }
-
-                    if (position.column == this.DEFAULT_INDENT.length) {
-                        prefix = ''
-                    }
-                } catch (error) {
-                    // console.error(error);
-                }
+                position = parser.getClassScopeInsertLine(this.CLASS_AST)
+                const indentation = this.resolveClassScopeIndentation(position)
+                prefix = indentation.prefix
+                suffix = indentation.suffix
             } else {
-                snippet = '\$\${2:var}\${3: = \${4:\'value\'}}'
-                suffix = `;${this.getEditor().document.lineAt(activeLine).isEmptyOrWhitespace ? '' : '\n'}`
-                position = {
-                    line   : selection.active.line,
-                    column : selection.active.character,
-                }
+                const freeForm = this.resolveFreeFormPosition(selection, activeLine)
+                snippet = freeForm.snippet
+                suffix = freeForm.suffix
+                position = freeForm.position
             }
         }
 
@@ -202,12 +213,7 @@ export default class Resolver {
         }
 
         try {
-            const _methodsOrFunctions = parser.getMethodsOrFunctions(editor.document.getText())
-            const functionBody = this.getIntersectedMethodOrFunction(_methodsOrFunctions, activeLine)
-
-            this.checkForStartOrEndIntersection(functionBody, selection)
-
-            const selectionTxt = this.checkStartWithChar(document, selection)
+            const {functionBody, selectionTxt, methodsOrFunctions} = this.validateExtraction(document, selection, activeLine)
             const hasReturn = parser.hasReturn(selectionTxt)
             const dependencies = parser.getVariableNames(selectionTxt)
             const methodParameters = dependencies.map((name) => {
@@ -234,7 +240,9 @@ export default class Resolver {
 
             methodName = methodName.replace(/^\$/, '')
 
-            if (_methodsOrFunctions.some((item) => item.name.name == methodName)) {
+            if (methodsOrFunctions
+                .filter((item) => item.kind !== 'closure')
+                .some((item) => item.name.name == methodName)) {
                 return utils.showMessage('method already exists')
             }
 
@@ -251,18 +259,17 @@ export default class Resolver {
             }
 
             const methodType = isFunction ? '' : 'private '
-            const _static = isStatic ? 'static ' : ''
+            const staticPrefix = isStatic ? 'static ' : ''
             const functionHeader = document.getText(parser.getRangeFromLoc(functionBody.loc.start, functionBody.body.loc.start))
             const returnType = hasReturn ? functionHeader.match(/\)\s*:\s*(.+?)\s*$/s)?.[1] : undefined
             const returnDeclaration = returnType ? `: ${returnType}` : ''
 
             const methodContent = '\n\n'
-              + `${indentation}${methodType}${_static}function ${methodName}(${methodParameters.join(', ')})${returnDeclaration}\n`
+              + `${indentation}${methodType}${staticPrefix}function ${methodName}(${methodParameters.join(', ')})${returnDeclaration}\n`
               + `${indentation}{\n`
               + `${indentation}${indentation || contentIndentation}${selectionTxt}\n`
               + `${indentation}}`
 
-            // add method
             await editor.edit((edit: vscode.TextEditorEdit) => {
                 edit.insert(
                     parser.getRangeFromLoc(functionBody.loc.end, functionBody.loc.end).end,
@@ -270,22 +277,19 @@ export default class Resolver {
                 )
             }, {undoStopBefore: false, undoStopAfter: false})
 
-            // replace selections
             if (replace) {
                 await editor.edit((edit: vscode.TextEditorEdit) => {
-                    const _this = isFunction
+                    const receiverPrefix = isFunction
                         ? ''
                         : (isStatic ? 'self::' : '$this->')
 
-                    edit.replace(selection, `${hasReturn ? 'return ' : ''}${_this}${methodName}(${methodArguments});`)
+                    edit.replace(selection, `${hasReturn ? 'return ' : ''}${receiverPrefix}${methodName}(${methodArguments});`)
                 }, {undoStopBefore: false, undoStopAfter: false})
             }
 
             return
         } catch (error) {
             utils.showMessage(error.message, true)
-
-            // console.error(error);
         }
     }
 
@@ -329,9 +333,34 @@ export default class Resolver {
             const returnType = header.slice(closingParenthesis + 1).replace(/=>\s*$/, '').trim()
             const line = document.lineAt(functionLike.loc.start.line - 1)
             const indentation = line.text.substring(0, line.firstNonWhitespaceCharacterIndex)
+            const bodyIndentation = `${indentation}${this.DEFAULT_INDENT}`
             const parameters = new Set(functionLike.arguments.map((argument) => argument.name.name))
             const superglobals = new Set(['this', 'GLOBALS', '_SERVER', '_GET', '_POST', '_FILES', '_COOKIE', '_SESSION', '_REQUEST', '_ENV', 'http_response_header', 'argc', 'argv'])
             const dependencies = new Set<string>()
+            const expressionLines = expression.split('\n')
+            const continuationIndents = expressionLines.slice(1)
+                .filter((item) => item.trim())
+                .map((item) => item.match(/^\s*/)?.[0] ?? '')
+            const commonContinuationIndent = continuationIndents.reduce((common, current) => {
+                let index = 0
+
+                while (index < common.length && common[index] === current[index]) {
+                    index++
+                }
+
+                return common.slice(0, index)
+            }, continuationIndents[0] ?? '')
+            const normalizedExpression = expressionLines.map((item, index) => {
+                if (index === 0) {
+                    return item.trimEnd()
+                }
+
+                if (!item.trim()) {
+                    return ''
+                }
+
+                return `${bodyIndentation}${item.slice(commonContinuationIndent.length).trimEnd()}`
+            }).join('\n')
 
             const collectVariables = (node: any): void => {
                 if (!node || typeof node !== 'object') {
@@ -348,14 +377,14 @@ export default class Resolver {
             collectVariables(functionLike.body)
             const useClause = dependencies.size ? ` use (${[...dependencies].join(', ')})` : ''
             replacement = `function${args}${useClause}${returnType ? ` ${returnType}` : ''} {\n`
-              + `${indentation}${this.DEFAULT_INDENT}return ${expression};\n`
+              + `${bodyIndentation}return ${normalizedExpression};\n`
               + `${indentation}}`
         } else {
             const bodyChildren = functionLike.body.children || []
             const returnStatement = bodyChildren.length === 1 && bodyChildren[0].kind === 'return'
 
             if (!returnStatement || !bodyChildren[0].expr) {
-                return utils.showMessage('only closures with one return statement can be shortened', true)
+                return utils.showMessage('conversion is not possible', true)
             }
 
             if (functionLike.uses?.some((use) => use.byref)) {
@@ -378,37 +407,172 @@ export default class Resolver {
         }, {undoStopBefore: true, undoStopAfter: true})
     }
 
+    private async convertArrowToClosureAndResolveSelections(
+        editor: vscode.TextEditor,
+        document: vscode.TextDocument,
+        selections: vscode.Selection[],
+        activeLine: number,
+        functionLike: any,
+    ): Promise<{
+        selections   : vscode.Selection[]
+        topSelection : vscode.Selection
+        activeLine   : number
+        propertyName : string
+        editor       : vscode.TextEditor
+        document     : vscode.TextDocument
+    } | undefined> {
+        let propertyName = await vscode.window.showInputBox({
+            placeHolder : 'property name',
+        })
+
+        if (!propertyName) {
+            utils.showMessage('please enter a property name')
+
+            return
+        }
+
+        propertyName = propertyName.replace(/^\$/, '')
+        propertyName = `\$${propertyName}`
+
+        // Save relative offset of the selection within the body expression,
+        // which is preserved verbatim after conversion
+        const bodyStartOffset = functionLike.body.loc.start.offset
+        const originalSelections = utils.sortSelections(selections).map((selection) => ({
+            text                 : document.getText(selection),
+            relativeOffsetInBody : document.offsetAt(selection.start) - bodyStartOffset,
+        }))
+
+        // Anchor by offset, not line — lines can drift after document mutation
+        const originalFnOffset = functionLike.loc.start.offset
+
+        await this.toggleFunctionSyntax()
+
+        // Re-read editor state after document modification
+        editor = this.getEditor()
+        document = editor.document
+
+        // Find the closure using offset-based anchor (lines can shift after conversion)
+        const anchorPos = document.positionAt(Math.min(originalFnOffset, document.getText().length - 1))
+        const newFunctionLike = parser.getFunctionLikeAtLines(document.getText(), anchorPos.line, anchorPos.line)
+
+        if (newFunctionLike?.kind !== 'closure') {
+            utils.showMessage('could not find the closure after conversion', true)
+
+            return
+        }
+
+        // The body expression is now inside the return statement
+        const returnStatement = newFunctionLike.body?.children?.[0]
+
+        if (returnStatement?.kind !== 'return' || !returnStatement.expr) {
+            utils.showMessage('could not find the expression after conversion', true)
+
+            return
+        }
+
+        const exprRange = parser.getRangeFromLoc(returnStatement.expr.loc.start, returnStatement.expr.loc.end)
+        const resolvedSelections = this.resolveSelectionsInConvertedArrowFunction(
+            document,
+            exprRange,
+            originalSelections,
+        )
+
+        if (resolvedSelections.length !== originalSelections.length) {
+            utils.showMessage('could not find the selection after conversion', true)
+
+            return
+        }
+
+        selections = resolvedSelections
+        const resolvedTopSelection = utils.sortSelections(selections)[0]
+
+        if (!resolvedTopSelection) {
+            utils.showMessage('could not find the selection after conversion', true)
+
+            return
+        }
+
+        const topSelection = resolvedTopSelection
+        activeLine = topSelection.start.line
+
+        return {selections, topSelection, activeLine, propertyName, editor, document}
+    }
+
     async extractToProperty() {
         let editor = this.getEditor()
-        const {selections, document} = editor
-        // @ts-expect-error ignore
-        const topSelection = utils.sortSelections(selections)[0]
-        const activeLine = topSelection.start.line
+        let {selections, document} = editor
+        let topSelection = utils.sortSelections(selections)[0]
 
-        try {
-            const _methodsOrFunctions = parser.getMethodsOrFunctions(document.getText())
-            const functionBody = this.getIntersectedMethodOrFunction(_methodsOrFunctions, activeLine)
+        if (!topSelection) {
+            return utils.showMessage('please select text', true)
+        }
 
-            this.checkForStartOrEndIntersection(functionBody, topSelection)
+        let activeLine = topSelection.start.line
 
-            const selectionTxt = this.checkStartWithChar(document, topSelection)
+        const functionLike = parser.getFunctionLikeAtLines(document.getText(), activeLine, activeLine)
+        let propertyName: string | null = null
 
-            let propertyName: any = await vscode.window.showInputBox({
-                placeHolder : 'property name',
-            })
+        if (functionLike?.kind === 'arrowfunc') {
+            const converted = await this.convertArrowToClosureAndResolveSelections(
+                editor, document, selections, activeLine, functionLike,
+            )
 
-            if (!propertyName) {
-                return utils.showMessage('please enter a property name')
+            if (!converted) {
+                return
             }
 
-            propertyName = propertyName.replace(/^\$/, '')
-            propertyName = `\$${propertyName}`
+            editor = converted.editor
+            document = converted.document
+            selections = converted.selections
+            topSelection = converted.topSelection
+            activeLine = converted.activeLine
+            propertyName = converted.propertyName
+        }
+
+        try {
+            let functionBody: any
+            let selectionTxt: string
+
+            // Use directly-found functionLike for closures (bypasses getMethodsOrFunctions
+            // which can fail to find closures that getFunctionLikeAtLines already found)
+            if (functionLike?.kind === 'closure') {
+                functionBody = functionLike
+                this.checkForStartOrEndIntersection(functionBody, topSelection)
+                selectionTxt = this.checkStartWithChar(document, topSelection)
+            } else if (functionLike?.kind === 'arrowfunc') {
+                const closureNode = parser.getFunctionLikeAtLines(document.getText(), activeLine, activeLine)
+
+                if (closureNode?.kind !== 'closure') {
+                    return utils.showMessage('could not find the closure after conversion', true)
+                }
+
+                functionBody = closureNode
+                this.checkForStartOrEndIntersection(functionBody, topSelection)
+                selectionTxt = this.checkStartWithChar(document, topSelection)
+            } else {
+                const result = this.validateExtraction(document, topSelection, activeLine, {includeClosures: true})
+                functionBody = result.functionBody
+                selectionTxt = result.selectionTxt
+            }
+
+            if (!propertyName) {
+                propertyName = await vscode.window.showInputBox({
+                    placeHolder : 'property name',
+                })
+
+                if (!propertyName) {
+                    return utils.showMessage('please enter a property name')
+                }
+
+                propertyName = propertyName.replace(/^\$/, '')
+                propertyName = `\$${propertyName}`
+            }
 
             const isEndOfStatement = selectionTxt.endsWith(';')
-            const extractionTxt = `${propertyName} = ${selectionTxt}${isEndOfStatement ? '' : ';\n'}`
+            const extractionTxt = `${propertyName} = ${selectionTxt}${isEndOfStatement ? '' : ';'}`
 
             editor = this.getEditor()
-            let _insertLocation = editor.selection
+            let insertLocation: vscode.Range | vscode.Selection = editor.selection
             const scope = this.getIntersectedScope(functionBody, topSelection.start.line, topSelection.end.line)
 
             let methodBodyLine
@@ -417,8 +581,7 @@ export default class Resolver {
 
             if (scope) {
                 const scopeBodyStart = scope.body.children?.[0]?.loc.start || scope.body.loc.end
-                // @ts-expect-error ignore
-                _insertLocation = parser.getRangeFromLoc(
+                insertLocation = parser.getRangeFromLoc(
                     {...scopeBodyStart, column: 0},
                     {...scopeBodyStart, column: 0},
                 )
@@ -427,8 +590,7 @@ export default class Resolver {
                 propertyContent = `${indentation}${extractionTxt}${extractionTxt.endsWith('\n') ? '' : '\n'}`
             } else {
                 const _currentMethodStart = functionBody.body.children[0].loc.start
-                // @ts-expect-error ignore
-                _insertLocation = parser.getRangeFromLoc(_currentMethodStart, _currentMethodStart)
+                insertLocation = parser.getRangeFromLoc(_currentMethodStart, _currentMethodStart)
                 methodBodyLine = document.lineAt(_currentMethodStart.line - 1)
                 indentation = methodBodyLine.text.substring(0, methodBodyLine.firstNonWhitespaceCharacterIndex)
                 propertyContent = `${extractionTxt}\n${indentation}`
@@ -441,17 +603,15 @@ export default class Resolver {
                     edit.replace(selection, `${propertyName}${isEndOfStatement ? ';' : ''}`)
                 }
 
-                edit.insert(_insertLocation.end, propertyContent)
+                edit.insert(insertLocation.end, propertyContent)
             }, {undoStopBefore: true, undoStopAfter: true})
 
-            const cursorPosition = _insertLocation.start.translate(0, indentation.length)
+            const cursorPosition = insertLocation.start.translate(0, indentation.length)
             editor.selection = new vscode.Selection(cursorPosition, cursorPosition)
 
             return edited
         } catch (error) {
             utils.showMessage(error.message, true)
-
-            // console.error(error);
         }
     }
 
@@ -480,6 +640,61 @@ export default class Resolver {
         return visit(node)
     }
 
+    resolveSelectionsInConvertedArrowFunction(
+        document: vscode.TextDocument,
+        expressionRange: vscode.Range,
+        originalSelections: {text: string, relativeOffsetInBody: number}[],
+    ): vscode.Selection[] {
+        const expressionText = document.getText(expressionRange)
+        const expressionOffset = document.offsetAt(expressionRange.start)
+
+        return originalSelections
+            .map((selection) => {
+                const matchOffset = this.findClosestOffset(expressionText, selection.text, selection.relativeOffsetInBody)
+
+                if (matchOffset === -1) {
+                    return null
+                }
+
+                const startOffset = expressionOffset + matchOffset
+                const startPos = document.positionAt(startOffset)
+                const endPos = document.positionAt(startOffset + selection.text.length)
+
+                return new vscode.Selection(startPos, endPos)
+            })
+            .filter((selection): selection is vscode.Selection => selection !== null)
+    }
+
+    findClosestOffset(text: string, searchText: string, targetOffset: number): number {
+        let bestMatch = -1
+        let bestDiff = Infinity
+        let searchPos = 0
+
+        while (true) {
+            const foundAt = text.indexOf(searchText, searchPos)
+
+            if (foundAt === -1) {
+                break
+            }
+
+            const diff = Math.abs(foundAt - targetOffset)
+
+            if (diff < bestDiff) {
+                bestDiff = diff
+                bestMatch = foundAt
+            }
+
+            searchPos = foundAt + 1
+        }
+
+        // Reject if too far from the target offset — likely the wrong occurrence
+        if (bestMatch !== -1 && bestDiff > Math.max(searchText.length * 2, 20)) {
+            return -1
+        }
+
+        return bestMatch
+    }
+
     async extractToClass() {
         const editor = this.getEditor()
         const {selections, selection, document} = editor
@@ -490,14 +705,8 @@ export default class Resolver {
         }
 
         try {
-            const _methodsOrFunctions = parser.getMethodsOrFunctions(document.getText())
-            const functionBody = this.getIntersectedMethodOrFunction(_methodsOrFunctions, activeLine)
+            const {functionBody, selectionTxt, methodsOrFunctions} = this.validateExtraction(document, selection, activeLine)
 
-            this.checkForStartOrEndIntersection(functionBody, selection)
-
-            const selectionTxt = this.checkStartWithChar(document, selection)
-
-            // Show directory picker
             const selectedDirectory = await vscode.window.showOpenDialog({
                 canSelectFiles   : false,
                 canSelectFolders : true,
@@ -513,7 +722,6 @@ export default class Resolver {
 
             const targetDirectory = selectedDirectory[0].fsPath
 
-            // Show input for class name
             const className: any = await vscode.window.showInputBox({
                 placeHolder   : 'Class name (e.g., MyNewClass)',
                 validateInput : (value: string) => {
@@ -533,10 +741,8 @@ export default class Resolver {
                 return utils.showMessage('please enter a class name')
             }
 
-            // Create the new file path
             const newFilePath = `${targetDirectory}/${className}.php`
 
-            // Check if file already exists
             try {
                 await vscode.workspace.fs.stat(vscode.Uri.file(newFilePath))
 
@@ -545,27 +751,22 @@ export default class Resolver {
                 // File doesn't exist, which is what we want
             }
 
-            // Get namespace for the new file
             const namespace = await utils.getNamespaceFromPath(newFilePath)
             const namespaceDeclaration = namespace ? `${namespace}\n\n` : ''
 
-            // Check if the selection covers a complete method by comparing selection bounds with method bounds
-            const selectedMethod = this.findCompleteMethodInSelection(selection, _methodsOrFunctions)
+            const selectedMethod = this.findCompleteMethodInSelection(selection, methodsOrFunctions)
 
             let classContent: string
             let methodName: string
             let replacementText: string
 
             if (selectedMethod) {
-                // Extract the complete method
                 methodName = selectedMethod.name.name
                 const isStatic = selectedMethod.isStatic === true
                 const methodParameters = this.generateMethodCallParameters(selectedMethod.arguments || [])
 
-                // Use the selected text as-is since it's a complete method
                 classContent = `<?php\n\n${namespaceDeclaration}class ${className}\n{\n    ${selectionTxt.trim()}\n}\n`
 
-                // Replace with class instantiation and method call
                 if (namespace) {
                     const namespaceParts = utils.getFQNOnly(namespace)?.split('\\') || []
                     const shortClassName = namespaceParts.length > 0 ? `\\${namespaceParts.join('\\')}\\${className}` : className
@@ -578,7 +779,6 @@ export default class Resolver {
                         : `(new ${className}())->${methodName}(${methodParameters});`
                 }
             } else {
-                // Extract partial code into a new method
                 methodName = 'extractedMethod'
                 classContent = `<?php\n\n${namespaceDeclaration}class ${className}\n{\n    public function ${methodName}()\n    {\n        ${selectionTxt.split('\n').join('\n        ')}\n    }\n}\n`
 
@@ -591,35 +791,30 @@ export default class Resolver {
                 }
             }
 
-            // Create the new file
             await vscode.workspace.fs.writeFile(
                 vscode.Uri.file(newFilePath),
                 Buffer.from(classContent),
             )
 
-            // Replace the selection with class instantiation and method call
             await editor.edit((edit: vscode.TextEditorEdit) => {
                 edit.replace(selection, replacementText)
             }, {undoStopBefore: false, undoStopAfter: false})
 
-            // Open the new file
             const newDocument = await vscode.workspace.openTextDocument(newFilePath)
             await vscode.window.showTextDocument(newDocument)
 
             utils.showMessage(`Class ${className} created successfully`)
         } catch (error: any) {
             utils.showMessage(error.message, true)
-            // console.error(error);
         }
     }
 
     findCompleteMethodInSelection(selection: vscode.Selection, methodsOrFunctions: any[]): any | null {
-        // Check if the selection exactly matches a method/function boundaries
         for (const method of methodsOrFunctions) {
             const methodStartLine = method.loc.start.line - 1
             const methodEndLine = method.loc.end.line - 1
 
-            // Check if selection start and end match the method boundaries (with some tolerance for whitespace)
+            // (with some tolerance for whitespace)
             if (selection.start.line >= methodStartLine - 1
               && selection.start.line <= methodStartLine + 1
               && selection.end.line >= methodEndLine - 1
@@ -637,55 +832,48 @@ export default class Resolver {
         }
 
         return methodArguments.map((arg, index) => {
-            let paramName = (arg.name && arg.name.name) || `param${index + 1}`
+            const paramName = this.getArgumentName(arg, index)
 
-            // Ensure paramName is a string
-            if (typeof paramName !== 'string') {
-                paramName = `param${index + 1}`
-            }
-
-            // Remove $ prefix if it exists for cleaner placeholder
-            if (paramName.startsWith('$')) {
-                paramName = paramName.substring(1)
-            }
-
-            // Generate placeholder based on parameter type and default value
             if (arg.value) {
-                // Has default value, make it optional with a meaningful placeholder
-                if (arg.type) {
-                    return `/* ${arg.type} */ $${paramName}`
-                }
-
-                return `$${paramName}`
-            } else {
-                // Required parameter
-                if (arg.type && arg.type.name) {
-                    // Has type hint
-                    const typeName = arg.type.name
-
-                    switch (typeName.toLowerCase()) {
-                        case 'string':
-                            return `'${paramName}'`
-                        case 'int':
-                        case 'integer':
-                            return '0'
-                        case 'bool':
-                        case 'boolean':
-                            return 'false'
-                        case 'array':
-                            return '[]'
-                        case 'float':
-                        case 'double':
-                            return '0.0'
-                        default:
-                            return `$${paramName}`
-                    }
-                } else {
-                    // No type hint, use variable placeholder
-                    return `$${paramName}`
-                }
+                return arg.type ? `/* ${arg.type} */ $${paramName}` : `$${paramName}`
             }
+
+            if (!arg.type?.name) {
+                return `$${paramName}`
+            }
+
+            return this.getTypedParameterPlaceholder(arg.type.name, paramName)
         }).join(', ')
+    }
+
+    getArgumentName(arg: any, index: number): string {
+        let paramName = (arg.name && arg.name.name) || `param${index + 1}`
+
+        if (typeof paramName !== 'string') {
+            paramName = `param${index + 1}`
+        }
+
+        return paramName.startsWith('$') ? paramName.substring(1) : paramName
+    }
+
+    getTypedParameterPlaceholder(typeName: string, paramName: string): string {
+        switch (typeName.toLowerCase()) {
+            case 'string':
+                return `'${paramName}'`
+            case 'int':
+            case 'integer':
+                return '0'
+            case 'bool':
+            case 'boolean':
+                return 'false'
+            case 'array':
+                return '[]'
+            case 'float':
+            case 'double':
+                return '0.0'
+            default:
+                return `$${paramName}`
+        }
     }
 
     /* Missing ------------------------------------------------------------------ */
@@ -699,8 +887,8 @@ export default class Resolver {
         }
 
         try {
-            const _methodsOrFunctions = parser.getMethodsOrFunctions(editor.document.getText())
-            const functionBody = this.getIntersectedMethodOrFunction(_methodsOrFunctions, activeLine)
+            const methodsOrFunctions = parser.getMethodsOrFunctions(editor.document.getText())
+            const functionBody = this.getIntersectedMethodOrFunction(methodsOrFunctions, activeLine)
 
             const isFunction = functionBody.kind == 'function'
             const isStatic = functionBody.isStatic == true
@@ -720,10 +908,10 @@ export default class Resolver {
                 }
 
                 const methodType = isFunction ? '' : 'private '
-                const _static = isStatic ? 'static ' : ''
+                const staticPrefix = isStatic ? 'static ' : ''
 
                 const methodContent = '\n\n'
-                  + `${indentation}${methodType}${_static}function ${methodAndParams}\n`
+                  + `${indentation}${methodType}${staticPrefix}function ${methodAndParams}\n`
                   + `${indentation}{\n`
                   + `${indentation}${indentation}throw new \\Exception(__FUNCTION__ . ' not implemented.');\n`
                   + `${indentation}}`
@@ -737,8 +925,6 @@ export default class Resolver {
             }
         } catch (error) {
             utils.showMessage(error.message, true)
-
-            // console.error(error);
         }
     }
 
@@ -799,8 +985,24 @@ export default class Resolver {
         return selectionTxt
     }
 
-    getIntersectedMethodOrFunction(_methodsOrFunctions, activeLine) {
-        const intersectedFunctionBody = _methodsOrFunctions?.find((method) => parser.hasIntersection(method, activeLine))
+    validateExtraction(document: vscode.TextDocument, selection: vscode.Selection, activeLine: number, options?: {includeClosures?: boolean}): {functionBody: any, selectionTxt: string, methodsOrFunctions: any[]} {
+        const methodsOrFunctions = parser.getMethodsOrFunctions(document.getText())
+        const functionBody = this.getIntersectedMethodOrFunction(methodsOrFunctions, activeLine, options)
+
+        this.checkForStartOrEndIntersection(functionBody, selection)
+        const selectionTxt = this.checkStartWithChar(document, selection)
+
+        return {functionBody, selectionTxt, methodsOrFunctions}
+    }
+
+    getIntersectedMethodOrFunction(methodsOrFunctions, activeLine, options?: {includeClosures?: boolean}) {
+        let candidates = methodsOrFunctions
+
+        if (!options?.includeClosures) {
+            candidates = candidates?.filter((item) => item.kind !== 'closure')
+        }
+
+        const intersectedFunctionBody = candidates?.find((method) => parser.hasIntersection(method, activeLine))
 
         if (!intersectedFunctionBody) {
             throw new Error('only contents of method/function can be extracted')

@@ -79,3 +79,7 @@
 ## 0.3.4
 
 - dont race with current provider on renaming, instead act as a second layer for whatever falls out of the original provider scope
+
+## 0.3.5
+
+- fixes for extract to

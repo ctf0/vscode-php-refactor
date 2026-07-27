@@ -132,7 +132,7 @@ export default class CodeAction implements vscode.CodeActionProvider {
                 commands.push(
                     {
                         command : `${utils.PACKAGE_CMND_NAME}.extract_to_property`,
-                        title   : 'Extract To Property',
+                        title   : 'Extract To Property/Variable',
                         type    : vscode.CodeActionKind.RefactorRewrite,
                     },
                 )

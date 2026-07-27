@@ -1,7 +1,7 @@
 {
     "name": "vscode-php-refactor",
     "displayName": "PHP-Refactor",
-    "version": "0.3.4",
+    "version": "0.3.5",
     "publisher": "ctf0",
     "icon": "images/icon.png",
     "engines": {
@@ -112,7 +112,7 @@
             },
             {
                 "command": "phprefactor.extract_to_property",
-                "title": "Extract To Property",
+                "title": "Extract To Property/Variable",
                 "category": "PHP Refactor"
             },
             {
