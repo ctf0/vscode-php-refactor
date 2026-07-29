@@ -43,13 +43,7 @@ export default class Resolver {
             return
         }
 
-        const editor = this.EDITOR
-
-        if (!editor) {
-            return
-        }
-
-        const {document} = editor
+        const {document} = this.EDITOR
 
         const position = parser.getClassScopeInsertLine(this.CLASS_AST)
         const insertLine = document.lineAt(position.line)
@@ -62,7 +56,7 @@ export default class Resolver {
           + `${addIndent}${this.DEFAULT_INDENT}$0;\n`
           + `${addIndent}}\n${position.addSuffixLine ? '\n' : ''}`
 
-        return editor.insertSnippet(
+        return this.EDITOR.insertSnippet(
             new vscode.SnippetString(snippet),
             new vscode.Position(position.line, position.column),
         )
@@ -212,84 +206,132 @@ export default class Resolver {
             return utils.showMessage('extract to function doesnt work with multiple selections', true)
         }
 
-        try {
-            const {functionBody, selectionTxt, methodsOrFunctions} = this.validateExtraction(document, selection, activeLine)
-            const hasReturn = parser.hasReturn(selectionTxt)
-            const dependencies = parser.getVariableNames(selectionTxt)
-            const methodParameters = dependencies.map((name) => {
-                const argument = functionBody.arguments?.find((item) => item.name.name === name)
+        let functionBody: any
+        let methodsOrFunctions: any[]
 
-                if (!argument) {
-                    return `$${name}`
+        try {
+            const result = this.validateExtraction(document, selection, activeLine)
+            functionBody = result.functionBody
+            methodsOrFunctions = result.methodsOrFunctions
+        } catch (error) {
+            // Top-level code — determine class context for method vs function behavior
+            methodsOrFunctions = parser.getMethodsOrFunctions(document.getText())
+            functionBody = null
+        }
+
+        const selectionTxt = this.checkStartWithChar(document, selection)
+        const hasReturn = parser.hasReturn(selectionTxt)
+        const dependencies = parser.getVariableNames(selectionTxt)
+        const methodArguments = dependencies.map((name) => `$${name}`).join(', ')
+
+        let methodName: any = await vscode.window.showInputBox({
+            placeHolder : 'function/method name',
+        })
+
+        if (!methodName) {
+            return utils.showMessage('please enter a method/function name')
+        }
+
+        methodName = methodName.replace(/^\$/, '')
+
+        if (methodsOrFunctions
+            .filter((item) => item.kind !== 'closure')
+            .some((item) => item.name.name == methodName)) {
+            return utils.showMessage('method already exists')
+        }
+
+        if (!functionBody) {
+            // Top-level extraction — check if inside a class
+            const inClass = this.CLASS_AST
+              && parser.hasIntersection(this.CLASS_AST, activeLine)
+
+            if (inClass) {
+                const position = parser.getClassScopeInsertLine(this.CLASS_AST)
+                const docLine = document.lineAt(position.line)
+                const indentation = docLine.text.substring(0, docLine.firstNonWhitespaceCharacterIndex) || this.DEFAULT_INDENT
+
+                const methodContent = '\n\n'
+                  + `${indentation}private function ${methodName}(${methodArguments})\n`
+                  + `${indentation}{\n`
+                  + `${indentation}${this.DEFAULT_INDENT}${selectionTxt}\n`
+                  + `${indentation}}`
+
+                await editor.edit((edit: vscode.TextEditorEdit) => {
+                    edit.insert(
+                        new vscode.Position(position.line, position.column),
+                        methodContent,
+                    )
+                }, {undoStopBefore: false, undoStopAfter: false})
+
+                if (replace) {
+                    await this.replaceSelectionWithCall(editor, selection, '$this->', methodName, methodArguments, hasReturn)
+                }
+            } else {
+                const topStatement = parser.getTopLevelStatementAtLine(document.getText(), activeLine)
+
+                if (!topStatement) {
+                    return utils.showMessage('could not determine where to insert the function', true)
                 }
 
-                const prefix = document.getText(parser.getRangeFromLoc(argument.loc.start, argument.name.loc.start)).trim()
-                const cleanPrefix = prefix.replace(/^(public|protected|private|readonly)\s+/, '')
+                const methodContent = `\n\nfunction ${methodName}(${methodArguments})${hasReturn ? ': mixed' : ''}\n{\n    ${selectionTxt.trimEnd()}\n}`
 
-                return `${cleanPrefix}${cleanPrefix && !cleanPrefix.endsWith('&') ? ' ' : ''}$${name}`
-            })
-            const methodArguments = dependencies.map((name) => `$${name}`).join(', ')
+                await this.insertAfterFunctionBody(editor, topStatement, methodContent)
 
-            let methodName: any = await vscode.window.showInputBox({
-                placeHolder : 'function/method name',
-            })
-
-            if (!methodName) {
-                return utils.showMessage('please enter a method/function name')
-            }
-
-            methodName = methodName.replace(/^\$/, '')
-
-            if (methodsOrFunctions
-                .filter((item) => item.kind !== 'closure')
-                .some((item) => item.name.name == methodName)) {
-                return utils.showMessage('method already exists')
-            }
-
-            const isFunction = functionBody.kind == 'function'
-            const isStatic = functionBody.isStatic == true
-
-            let methodBodyLine = document.lineAt(functionBody.loc.start.line - 1)
-            const indentation = methodBodyLine.text.substring(0, methodBodyLine.firstNonWhitespaceCharacterIndex)
-            let contentIndentation = ''
-
-            if (!indentation) {
-                methodBodyLine = document.lineAt(selection.start.line)
-                contentIndentation = methodBodyLine.text.substring(0, methodBodyLine.firstNonWhitespaceCharacterIndex)
-            }
-
-            const methodType = isFunction ? '' : 'private '
-            const staticPrefix = isStatic ? 'static ' : ''
-            const functionHeader = document.getText(parser.getRangeFromLoc(functionBody.loc.start, functionBody.body.loc.start))
-            const returnType = hasReturn ? functionHeader.match(/\)\s*:\s*(.+?)\s*$/s)?.[1] : undefined
-            const returnDeclaration = returnType ? `: ${returnType}` : ''
-
-            const methodContent = '\n\n'
-              + `${indentation}${methodType}${staticPrefix}function ${methodName}(${methodParameters.join(', ')})${returnDeclaration}\n`
-              + `${indentation}{\n`
-              + `${indentation}${indentation || contentIndentation}${selectionTxt}\n`
-              + `${indentation}}`
-
-            await editor.edit((edit: vscode.TextEditorEdit) => {
-                edit.insert(
-                    parser.getRangeFromLoc(functionBody.loc.end, functionBody.loc.end).end,
-                    methodContent,
-                )
-            }, {undoStopBefore: false, undoStopAfter: false})
-
-            if (replace) {
-                await editor.edit((edit: vscode.TextEditorEdit) => {
-                    const receiverPrefix = isFunction
-                        ? ''
-                        : (isStatic ? 'self::' : '$this->')
-
-                    edit.replace(selection, `${hasReturn ? 'return ' : ''}${receiverPrefix}${methodName}(${methodArguments});`)
-                }, {undoStopBefore: false, undoStopAfter: false})
+                if (replace) {
+                    await this.replaceSelectionWithCall(editor, selection, '', methodName, methodArguments, hasReturn)
+                }
             }
 
             return
-        } catch (error) {
-            utils.showMessage(error.message, true)
+        }
+
+        const methodParameters = dependencies.map((name) => {
+            const argument = functionBody.arguments?.find((item) => item.name.name === name)
+
+            if (!argument) {
+                return `$${name}`
+            }
+
+            const prefix = document.getText(parser.getRangeFromLoc(argument.loc.start, argument.name.loc.start)).trim()
+            const cleanPrefix = prefix.replace(/^(public|protected|private|readonly)\s+/, '')
+
+            return `${cleanPrefix}${cleanPrefix && !cleanPrefix.endsWith('&') ? ' ' : ''}$${name}`
+        })
+
+        const isFunction = functionBody.kind == 'function'
+        const isStatic = functionBody.isStatic == true
+
+        let methodBodyLine = document.lineAt(functionBody.loc.start.line - 1)
+        const indentation = methodBodyLine.text.substring(0, methodBodyLine.firstNonWhitespaceCharacterIndex)
+        let contentIndentation = ''
+
+        if (!indentation) {
+            methodBodyLine = document.lineAt(selection.start.line)
+            contentIndentation = methodBodyLine.text.substring(0, methodBodyLine.firstNonWhitespaceCharacterIndex)
+        }
+
+        const methodType = isFunction ? '' : 'private '
+        const staticPrefix = isStatic ? 'static ' : ''
+        const functionHeader = document.getText(parser.getRangeFromLoc(functionBody.loc.start, functionBody.body.loc.start))
+        const returnType = hasReturn ? functionHeader.match(/\)\s*:\s*(.+?)\s*$/s)?.[1] : undefined
+        const returnDeclaration = returnType ? `: ${returnType}` : ''
+
+        const methodContent = '\n\n'
+          + `${indentation}${methodType}${staticPrefix}function ${methodName}(${methodParameters.join(', ')})${returnDeclaration}\n`
+          + `${indentation}{\n`
+          + `${indentation}${indentation || contentIndentation}${selectionTxt}\n`
+          + `${indentation}}`
+
+        await this.insertAfterFunctionBody(editor, functionBody, methodContent)
+
+        if (replace) {
+            await editor.edit((edit: vscode.TextEditorEdit) => {
+                const receiverPrefix = isFunction
+                    ? ''
+                    : (isStatic ? 'self::' : '$this->')
+
+                edit.replace(selection, `${hasReturn ? 'return ' : ''}${receiverPrefix}${methodName}(${methodArguments});`)
+            }, {undoStopBefore: false, undoStopAfter: false})
         }
     }
 
@@ -329,8 +371,7 @@ export default class Resolver {
 
         if (functionLike.kind === 'arrowfunc') {
             const expression = document.getText(parser.getRangeFromLoc(functionLike.body.loc.start, functionLike.body.loc.end)).trim()
-            const args = header.slice(openingParenthesis, closingParenthesis + 1)
-            const returnType = header.slice(closingParenthesis + 1).replace(/=>\s*$/, '').trim()
+            const {args, returnType} = this.parseFunctionHeader(header, openingParenthesis, closingParenthesis, /=>\s*$/)
             const line = document.lineAt(functionLike.loc.start.line - 1)
             const indentation = line.text.substring(0, line.firstNonWhitespaceCharacterIndex)
             const bodyIndentation = `${indentation}${this.DEFAULT_INDENT}`
@@ -395,10 +436,7 @@ export default class Resolver {
                 bodyChildren[0].expr.loc.start,
                 bodyChildren[0].expr.loc.end,
             )).trim()
-            const args = header.slice(openingParenthesis, closingParenthesis + 1)
-            const returnType = header.slice(closingParenthesis + 1)
-                .replace(/use\s*\([^)]*\)/, '')
-                .trim()
+            const {args, returnType} = this.parseFunctionHeader(header, openingParenthesis, closingParenthesis, /use\s*\([^)]*\)/)
             replacement = `fn${args}${returnType ? ` ${returnType}` : ''} => ${expression}`
         }
 
@@ -498,6 +536,109 @@ export default class Resolver {
         return {selections, topSelection, activeLine, propertyName, editor, document}
     }
 
+    private insertAfterFunctionBody(editor: vscode.TextEditor, functionBody: any, methodContent: string): Thenable<boolean> {
+        return editor.edit((edit: vscode.TextEditorEdit) => {
+            edit.insert(
+                parser.getRangeFromLoc(functionBody.loc.end, functionBody.loc.end).end,
+                methodContent,
+            )
+        }, {undoStopBefore: false, undoStopAfter: false})
+    }
+
+    private getShortClassName(namespace: string | undefined, className: string): string {
+        if (!namespace) {
+            return className
+        }
+
+        const namespaceParts = utils.getFQNOnly(namespace)?.split('\\') || []
+
+        return namespaceParts.length > 0 ? `\\${namespaceParts.join('\\')}\\${className}` : className
+    }
+
+    private async replaceSelectionWithCall(
+        editor: vscode.TextEditor,
+        selection: vscode.Selection | vscode.Range,
+        prefix: string,
+        methodName: string,
+        methodArguments: string,
+        hasReturn: boolean,
+    ): Promise<void> {
+        await editor.edit((edit: vscode.TextEditorEdit) => {
+            edit.replace(selection, `${hasReturn ? 'return ' : ''}${prefix}${methodName}(${methodArguments});`)
+        }, {undoStopBefore: false, undoStopAfter: false})
+    }
+
+    private resolveScopeForNode(
+        node: any,
+        startLine: number,
+        endLine: number,
+        dependencies: string[],
+        document: vscode.TextDocument,
+        extractionTxt: string,
+    ): {insertLocation: vscode.Range, indentation: string, propertyContent: string} | undefined {
+        const scope = this.getIntersectedScope(node, startLine, endLine)
+
+        if (!scope) {
+            return undefined
+        }
+
+        const scopeResult = this.resolveScopeInsertLocation(scope, dependencies, document)
+
+        if (!scopeResult) {
+            return undefined
+        }
+
+        return {
+            insertLocation  : scopeResult.insertRange,
+            indentation     : scopeResult.indentation,
+            propertyContent : `${scopeResult.indentation}${extractionTxt}${extractionTxt.endsWith('\n') ? '' : '\n'}`,
+        }
+    }
+
+    private resolveScopeInsertLocation(
+        scope: any,
+        dependencies: string[],
+        document: vscode.TextDocument,
+    ): {insertRange: vscode.Range, indentation: string} | undefined {
+        const lastVarDecl = parser.findLastVariableDeclarationNode(scope.body.children || [], dependencies)
+
+        if (lastVarDecl) {
+            return {
+                insertRange : parser.getRangeFromLoc(
+                    {line: lastVarDecl.loc.end.line + 1, column: 0},
+                    {line: lastVarDecl.loc.end.line + 1, column: 0},
+                ),
+                indentation : document.lineAt(lastVarDecl.loc.end.line - 1).text.substring(0, document.lineAt(lastVarDecl.loc.end.line - 1).firstNonWhitespaceCharacterIndex),
+            }
+        }
+
+        const scopeBodyStart = scope.body.children?.[0]?.loc.start || scope.body.loc.end
+
+        return {
+            insertRange : parser.getRangeFromLoc(
+                {...scopeBodyStart, column: 0},
+                {...scopeBodyStart, column: 0},
+            ),
+            indentation : document.lineAt(scopeBodyStart.line - 1).text.substring(0, document.lineAt(scopeBodyStart.line - 1).firstNonWhitespaceCharacterIndex),
+        }
+    }
+
+    private parseFunctionHeader(
+        header: string,
+        openingParenthesis: number,
+        closingParenthesis: number,
+        suffixPattern?: RegExp,
+    ): {args: string, returnType: string} {
+        const args = header.slice(openingParenthesis, closingParenthesis + 1)
+        let returnType = header.slice(closingParenthesis + 1)
+
+        if (suffixPattern) {
+            returnType = returnType.replace(suffixPattern, '')
+        }
+
+        return {args, returnType: returnType.trim()}
+    }
+
     async extractToProperty() {
         let editor = this.getEditor()
         let {selections, document} = editor
@@ -550,9 +691,16 @@ export default class Resolver {
                 this.checkForStartOrEndIntersection(functionBody, topSelection)
                 selectionTxt = this.checkStartWithChar(document, topSelection)
             } else {
-                const result = this.validateExtraction(document, topSelection, activeLine, {includeClosures: true})
-                functionBody = result.functionBody
-                selectionTxt = result.selectionTxt
+                try {
+                    const result = this.validateExtraction(document, topSelection, activeLine, {includeClosures: true})
+                    functionBody = result.functionBody
+                    selectionTxt = result.selectionTxt
+                } catch (error) {
+                    // No enclosing function/method/closure — treat as top-level code,
+                    // the parser will find the top-level statement to insert before
+                    selectionTxt = this.checkStartWithChar(document, topSelection)
+                    functionBody = null
+                }
             }
 
             if (!propertyName) {
@@ -572,29 +720,73 @@ export default class Resolver {
             const extractionTxt = `${propertyName} = ${selectionTxt}${isEndOfStatement ? '' : ';'}`
 
             editor = this.getEditor()
-            let insertLocation: vscode.Range | vscode.Selection = editor.selection
-            const scope = this.getIntersectedScope(functionBody, topSelection.start.line, topSelection.end.line)
 
+            const dependencies = parser.getVariableNames(extractionTxt)
+            let insertLocation: vscode.Range | vscode.Selection = editor.selection
             let methodBodyLine
             let propertyContent
             let indentation
 
-            if (scope) {
-                const scopeBodyStart = scope.body.children?.[0]?.loc.start || scope.body.loc.end
-                insertLocation = parser.getRangeFromLoc(
-                    {...scopeBodyStart, column: 0},
-                    {...scopeBodyStart, column: 0},
-                )
-                methodBodyLine = document.lineAt(scopeBodyStart.line - 1)
-                indentation = methodBodyLine.text.substring(0, methodBodyLine.firstNonWhitespaceCharacterIndex)
-                propertyContent = `${indentation}${extractionTxt}${extractionTxt.endsWith('\n') ? '' : '\n'}`
+            if (!functionBody) {
+                const topStatement = parser.getTopLevelStatementAtLine(document.getText(), topSelection.start.line)
+
+                if (!topStatement) {
+                    return utils.showMessage('could not determine where to insert the variable', true)
+                }
+
+                // Resolve scope within the top-level control structure (foreach/if/while body)
+                const scopeResult = this.resolveScopeForNode(topStatement, topSelection.start.line, topSelection.end.line, dependencies, document, extractionTxt)
+
+                if (scopeResult) {
+                    insertLocation = scopeResult.insertLocation
+                    indentation = scopeResult.indentation
+                    propertyContent = scopeResult.propertyContent
+                    editor.selection = topSelection
+                } else if (topStatement.body?.children?.length) {
+                    const bodyChild = topStatement.body.children[0].loc.start
+                    insertLocation = parser.getRangeFromLoc(
+                        {line: bodyChild.line, column: 0},
+                        {line: bodyChild.line, column: 0},
+                    )
+                    methodBodyLine = document.lineAt(bodyChild.line - 1)
+                    indentation = methodBodyLine.text.substring(0, methodBodyLine.firstNonWhitespaceCharacterIndex)
+                    propertyContent = `${indentation}${extractionTxt}${extractionTxt.endsWith('\n') ? '' : '\n'}`
+                    editor.selection = topSelection
+                } else {
+                    const statementStart = topStatement.loc.start
+                    insertLocation = parser.getRangeFromLoc(
+                        {line: statementStart.line, column: 0},
+                        {line: statementStart.line, column: 0},
+                    )
+                    indentation = ''
+                    propertyContent = `${extractionTxt}\n`
+                    editor.selection = topSelection
+                }
             } else {
-                const _currentMethodStart = functionBody.body.children[0].loc.start
-                insertLocation = parser.getRangeFromLoc(_currentMethodStart, _currentMethodStart)
-                methodBodyLine = document.lineAt(_currentMethodStart.line - 1)
-                indentation = methodBodyLine.text.substring(0, methodBodyLine.firstNonWhitespaceCharacterIndex)
-                propertyContent = `${extractionTxt}\n${indentation}`
-                editor.selection = topSelection
+                const scopeResult = this.resolveScopeForNode(functionBody, topSelection.start.line, topSelection.end.line, dependencies, document, extractionTxt)
+
+                if (scopeResult) {
+                    insertLocation = scopeResult.insertLocation
+                    indentation = scopeResult.indentation
+                    propertyContent = scopeResult.propertyContent
+                } else {
+                    const lastVarDecl = parser.findLastVariableDeclarationNode(functionBody.body.children || [], dependencies)
+
+                    if (lastVarDecl) {
+                        insertLocation = parser.getRangeFromLoc(
+                            {line: lastVarDecl.loc.end.line + 1, column: 0},
+                            {line: lastVarDecl.loc.end.line + 1, column: 0},
+                        )
+                        indentation = document.lineAt(lastVarDecl.loc.end.line - 1).text.substring(0, document.lineAt(lastVarDecl.loc.end.line - 1).firstNonWhitespaceCharacterIndex)
+                    } else {
+                        const _currentMethodStart = functionBody.body.children[0].loc.start
+                        insertLocation = parser.getRangeFromLoc(_currentMethodStart, _currentMethodStart)
+                        indentation = document.lineAt(_currentMethodStart.line - 1).text.substring(0, document.lineAt(_currentMethodStart.line - 1).firstNonWhitespaceCharacterIndex)
+                    }
+
+                    propertyContent = `${extractionTxt}\n${indentation}`
+                    editor.selection = topSelection
+                }
             }
 
             const sortedSelections = utils.sortSelections(selections).reverse()
@@ -616,13 +808,17 @@ export default class Resolver {
     }
 
     getIntersectedScope(node, startLine: number, endLine: number): any {
+        // Only function-like nodes should exclude their own body — for control
+        // structures (foreach/if/while) the body IS the scope to insert into.
+        const isFunctionLike = ['function', 'method', 'closure', 'arrowfunc'].includes(node.kind)
+
         const visit = (value: any, insideArrowFunction = false): any => {
             if (!value || typeof value !== 'object') {
                 return
             }
 
             const isArrowFunction = value.kind === 'arrowfunc'
-            const isScope = !insideArrowFunction && value.kind === 'block' && value.loc && value !== node.body
+            const isScope = !insideArrowFunction && value.kind === 'block' && value.loc && (!isFunctionLike || value !== node.body)
               && value.loc.start.line - 1 <= startLine
               && value.loc.end.line - 1 >= endLine
 
@@ -704,9 +900,19 @@ export default class Resolver {
             return utils.showMessage('extract to class doesnt work with multiple selections', true)
         }
 
-        try {
-            const {functionBody, selectionTxt, methodsOrFunctions} = this.validateExtraction(document, selection, activeLine)
+        let selectionTxt: string
+        let methodsOrFunctions: any[]
 
+        try {
+            const result = this.validateExtraction(document, selection, activeLine)
+            selectionTxt = result.selectionTxt
+            methodsOrFunctions = result.methodsOrFunctions
+        } catch (error) {
+            methodsOrFunctions = parser.getMethodsOrFunctions(document.getText())
+            selectionTxt = this.checkStartWithChar(document, selection)
+        }
+
+        try {
             const selectedDirectory = await vscode.window.showOpenDialog({
                 canSelectFiles   : false,
                 canSelectFolders : true,
@@ -767,28 +973,15 @@ export default class Resolver {
 
                 classContent = `<?php\n\n${namespaceDeclaration}class ${className}\n{\n    ${selectionTxt.trim()}\n}\n`
 
-                if (namespace) {
-                    const namespaceParts = utils.getFQNOnly(namespace)?.split('\\') || []
-                    const shortClassName = namespaceParts.length > 0 ? `\\${namespaceParts.join('\\')}\\${className}` : className
-                    replacementText = isStatic
-                        ? `${shortClassName}::${methodName}(${methodParameters});`
-                        : `(new ${shortClassName}())->${methodName}(${methodParameters});`
-                } else {
-                    replacementText = isStatic
-                        ? `${className}::${methodName}(${methodParameters});`
-                        : `(new ${className}())->${methodName}(${methodParameters});`
-                }
+                const shortClassName = this.getShortClassName(namespace, className)
+                replacementText = isStatic
+                    ? `${shortClassName}::${methodName}(${methodParameters});`
+                    : `(new ${shortClassName}())->${methodName}(${methodParameters});`
             } else {
                 methodName = 'extractedMethod'
                 classContent = `<?php\n\n${namespaceDeclaration}class ${className}\n{\n    public function ${methodName}()\n    {\n        ${selectionTxt.split('\n').join('\n        ')}\n    }\n}\n`
 
-                if (namespace) {
-                    const namespaceParts = utils.getFQNOnly(namespace)?.split('\\') || []
-                    const shortClassName = namespaceParts.length > 0 ? `\\${namespaceParts.join('\\')}\\${className}` : className
-                    replacementText = `(new ${shortClassName}())->${methodName}();`
-                } else {
-                    replacementText = `(new ${className}())->${methodName}();`
-                }
+                replacementText = `(new ${this.getShortClassName(namespace, className)}())->${methodName}();`
             }
 
             await vscode.workspace.fs.writeFile(
@@ -916,12 +1109,7 @@ export default class Resolver {
                   + `${indentation}${indentation}throw new \\Exception(__FUNCTION__ . ' not implemented.');\n`
                   + `${indentation}}`
 
-                return editor.edit((edit: vscode.TextEditorEdit) => {
-                    edit.insert(
-                        parser.getRangeFromLoc(functionBody.loc.end, functionBody.loc.end).end,
-                        methodContent,
-                    )
-                }, {undoStopBefore: false, undoStopAfter: false})
+                return this.insertAfterFunctionBody(editor, functionBody, methodContent)
             }
         } catch (error) {
             utils.showMessage(error.message, true)
@@ -946,20 +1134,8 @@ export default class Resolver {
                 const readOnly = this.config.showReadonly ? ' readonly' : ''
 
                 const position: any = parser.getClassScopeInsertLine(this.CLASS_AST)
-                let prefix = position.addPrefixLine ? '\n\n' : '\n'
-                let suffix = position.addSuffixLine ? ';\n\n' : ';'
-                let snippet = `\${1|public,private,protected|}${readOnly} \${2:type} \\$${propName}\${4: = \${5:'value'}}`
-
-                if (position.column == 0) {
-                    prefix = this.DEFAULT_INDENT
-                    suffix = position.addSuffixLine ? ';\n' : ';'
-                }
-
-                if (position.column == this.DEFAULT_INDENT.length) {
-                    prefix = ''
-                }
-
-                snippet = `${prefix}${snippet}${suffix}`
+                const {prefix, suffix} = this.resolveClassScopeIndentation(position)
+                const snippet = `${prefix}\${1|public,private,protected|}${readOnly} \${2:type} \\$${propName}\${4: = \${5:'value'}}${suffix}`
 
                 return editor.insertSnippet(
                     new vscode.SnippetString(snippet),

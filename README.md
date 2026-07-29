@@ -5,7 +5,8 @@
     - a method and add an argument
     - otherwise, it will add the new property to the class scope
 - add all magic methods (if not already in the file)
-- (basic) extract selection to method/property "selection must be inside a method/function"
+- convert function to short `fn() =>` and normal `function() {}`
+- extract selection to method/property
     - new method/function will be added right after the selection method/function
 - (basic) extract selection to new class file
 - support updating file/s namespace on `move/rename`

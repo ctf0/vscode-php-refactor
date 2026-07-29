@@ -310,8 +310,49 @@ function flagsToVisibility(flags: number): string {
     return type
 }
 
+export function getTopLevelStatementAtLine(content: string, lineNumber: number): any {
+    try {
+        const AST = buildASTFromContent(content)
+        const root = AST?.children?.find((item: any) => item.kind == 'namespace') || AST
+
+        if (!root?.children) {
+            return null
+        }
+
+        return root.children.find((item: any) =>
+            item.kind && item.loc
+            && item.loc.start.line - 1 <= lineNumber
+            && item.loc.end.line - 1 >= lineNumber,
+        )
+    } catch (error) {
+        return null
+    }
+}
+
 export function hasStartOrEndIntersection(symbol, selection): boolean {
     return symbol.loc.start.line - 1 === selection.start.line || symbol.loc.end.line - 1 === selection.end.line
+}
+
+export function findLastVariableDeclarationNode(nodes: any[], variableNames?: string[]): any | null {
+    for (let i = nodes.length - 1; i >= 0; i--) {
+        const node = nodes[i]
+
+        if (
+            node.kind === 'expressionstatement'
+            && node.expression?.kind === 'assign'
+            && node.expression.left?.kind === 'variable'
+        ) {
+            if (variableNames && variableNames.length > 0) {
+                if (variableNames.includes(node.expression.left.name)) {
+                    return node
+                }
+            } else {
+                return node
+            }
+        }
+    }
+
+    return null
 }
 
 export function hasIntersection(symbol, lineNumber): boolean {

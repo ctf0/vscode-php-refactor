@@ -232,6 +232,19 @@ async function updateFileTypeContentEverywhere(
     }
 }
 
+async function replaceNamespaceInFiles(
+    files: string[],
+    fromNamespace: string,
+    toNamespace: string,
+): Promise<boolean> {
+    const results = await replaceInFile({
+        files,
+        processor : (input: string) => input.replace(new RegExp(escapeStringRegexp(fromNamespace), 'g'), toNamespace),
+    })
+
+    return results.some((item) => item.hasChanged)
+}
+
 /* Everywhere --------------------------------------------------------------- */
 
 async function updateEverywhereForDirs(
@@ -261,12 +274,7 @@ async function updateEverywhereForDirs(
         message : `Updating references from "${fromNamespace}" to "${toNamespace}"`,
     })
 
-    const results = await replaceInFile({
-        files     : await utils.getFilesList(dirToPath, excludedFiles),
-        processor : (input: string) => input.replace(new RegExp(escapeStringRegexp(fromNamespace), 'g'), toNamespace),
-    })
-
-    if (results.some((item) => item.hasChanged)) {
+    if (await replaceNamespaceInFiles(await utils.getFilesList(dirToPath, excludedFiles), fromNamespace, toNamespace)) {
         madeChanges = true
     }
 }
@@ -285,12 +293,7 @@ async function updateOldNSPathEverywhere(
     })
 
     // moved from/to namespace
-    const results = await replaceInFile({
-        files     : await utils.getFilesList(fileToPath, excludedFiles),
-        processor : (input: string) => input.replace(new RegExp(escapeStringRegexp(fromNamespace), 'g'), toNamespace),
-    })
-
-    if (results.some((item) => item.hasChanged)) {
+    if (await replaceNamespaceInFiles(await utils.getFilesList(fileToPath, excludedFiles), fromNamespace, toNamespace)) {
         madeChanges = true
     }
 }
