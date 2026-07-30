@@ -1,7 +1,7 @@
 {
     "name": "vscode-php-refactor",
     "displayName": "PHP-Refactor",
-    "version": "0.3.6",
+    "version": "0.3.7",
     "publisher": "ctf0",
     "icon": "images/icon.png",
     "engines": {
@@ -206,21 +206,21 @@
     },
     "scripts": {
         "vscode:prepublish": "npm run esbuild-base -- --pure:console.log --minify",
-        "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=out/main.js --external:vscode --format=cjs --platform=node",
+        "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=out/main.js --external:vscode --external:php-parser --external:fast-glob --external:replace-in-file --external:execa --format=cjs --platform=node",
         "esbuild": "npm run esbuild-base -- --sourcemap",
         "esbuild-watch": "npm run esbuild-base -- --sourcemap --watch",
         "watch": "npm run esbuild"
     },
     "devDependencies": {
         "@types/lodash.set": "^4.3.9",
-        "@types/node": "^26.1.1",
+        "@types/node": "^26.1.2",
         "@types/vscode": "^1.110.0",
         "esbuild": "^0.28.1",
         "typescript": "^7.0.2"
     },
     "dependencies": {
         "escape-string-regexp": "^5.0.0",
-        "execa": "^9.6.1",
+        "execa": "^10.0.0",
         "fast-glob": "^3.3.3",
         "lodash.set": "^4.3.2",
         "php-parser": "^3.7.0",
