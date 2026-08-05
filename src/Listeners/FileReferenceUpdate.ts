@@ -45,6 +45,10 @@ export default async function updateFileReferences(event: vscode.FileRenameEvent
                 const to = file.newUri.fsPath
                 const _scheme = await fs.stat(to)
 
+                if (from.endsWith('.blade.php') || to.endsWith('.blade.php')) {
+                    continue
+                }
+
                 if (_scheme.isDirectory()) {
                     await replaceFromNamespaceForDirs(to, from, progress, excludedFiles)
                 } else {
