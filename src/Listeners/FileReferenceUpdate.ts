@@ -45,15 +45,16 @@ export default async function updateFileReferences(event: vscode.FileRenameEvent
                 const to = file.newUri.fsPath
                 const _scheme = await fs.stat(to)
 
-                if (from.endsWith('.blade.php') || to.endsWith('.blade.php')) {
-                    continue
-                }
-
                 if (_scheme.isDirectory()) {
                     await replaceFromNamespaceForDirs(to, from, progress, excludedFiles)
                 } else {
                     // ignore if not php
                     if (utils.getFileExtFromPath(from) !== utils.EXT || utils.getFileExtFromPath(to) !== utils.EXT) {
+                        continue
+                    }
+
+                    // ignore if blade
+                    if (from.endsWith('.blade.php') || to.endsWith('.blade.php')) {
                         continue
                     }
 
@@ -69,7 +70,7 @@ export default async function updateFileReferences(event: vscode.FileRenameEvent
                         }
 
                         if (await updateFileNamespace(to, progress)) {
-                            await updateOldNSPathEverywhere(to, _getFileNameAndNamespace, progress)
+                            await updateOldNSPathEverywhere(to, _getFileNameAndNamespace, progress, excludedFiles)
                         }
                     }
                     // new file name
