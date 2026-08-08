@@ -11,15 +11,15 @@ export const PACKAGE_NAME = 'phpRefactor'
 export let config: vscode.WorkspaceConfiguration
 export let filesExcludeGlob: string[]
 export let noNamespaceList: string[]
-export let NS_EXTENSION_PROVIDER: types.NamespaceProvider
+let NS_EXTENSION_PROVIDER: types.NamespaceProvider
 export const EXT = '.php'
-export let composerCmnd = ''
-export const outputChannel = vscode.window.createOutputChannel('PHP Refactor')
+let composerCmnd = ''
+const outputChannel = vscode.window.createOutputChannel('PHP Refactor')
 
 export function showMessage(msg: string, error = false, items: string[] = []): types.ShowMessageResult {
     return error
-        ? vscode.window.showErrorMessage(`PHP Refactor: ${msg}`, ...items)
-        : vscode.window.showInformationMessage(`PHP Refactor: ${msg}`, ...items)
+        ? vscode.window.showErrorMessage(msg, ...items)
+        : vscode.window.showInformationMessage(msg, ...items)
 }
 
 export function setConfig(): void {
@@ -33,7 +33,7 @@ export function getConfig(key: string): any {
     return config.get(key)
 }
 
-export function getFileNameFromPath(filePath: string): string {
+function getFileNameFromPath(filePath: string): string {
     return path.parse(filePath).name
 }
 
@@ -45,7 +45,7 @@ export function getDirNameFromPath(filePath: string): string {
     return path.parse(filePath).dir
 }
 
-export async function getFileNamespace(uri?: vscode.Uri): Promise<string | undefined> {
+async function getFileNamespace(uri?: vscode.Uri): Promise<string | undefined> {
     try {
         return await NS_EXTENSION_PROVIDER.getNamespace(uri)
     } catch {
@@ -105,7 +105,7 @@ export function getFQNOnly(text: string | undefined): string | undefined {
     return text ? text.replace(/(namespace\s+|\n|;)/g, '') : undefined
 }
 
-export function getCWD(path: string): string | undefined {
+function getCWD(path: string): string | undefined {
     return vscode.workspace.getWorkspaceFolder(vscode.Uri.file(path))?.uri.fsPath
 }
 

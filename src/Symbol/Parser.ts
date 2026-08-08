@@ -150,11 +150,11 @@ export function hasReturn(content: string): boolean {
     }
 }
 
-export function getMethods(_classAST: any): any[] | undefined {
+function getMethods(_classAST: any): any[] | undefined {
     return _classAST?.body.filter((item: any) => item.kind == 'method')
 }
 
-export function getAllClosures(AST: any): any[] {
+function getAllClosures(AST: any): any[] {
     const closures: any[] = []
 
     const visit = (node: any): void => {
@@ -182,7 +182,7 @@ export function getAllClosures(AST: any): any[] {
     return closures
 }
 
-export function getFunctions(AST) {
+function getFunctions(AST) {
     const filterExtra = AST?.children?.filter((item: any) => !/declare|usegroup|expressionstatement|function/.test(item.kind))
 
     return AST?.children
@@ -192,7 +192,7 @@ export function getFunctions(AST) {
 }
 
 export function getConstructor(_classAST: any, getArgsOnly = false) {
-    const _const = getMethods(_classAST)?.find((item: any) => item.name.name == '__construct')
+    const _const = getMethods(_classAST)?.find((item: any) => getName(item) == '__construct')
 
     if (getArgsOnly) {
         return _const?.arguments.map((item: PhpParser.Parameter) =>
@@ -256,7 +256,7 @@ export function getClassScopeInsertLine(_classAST: any) {
     }
 }
 
-export function getAllProperties(_classAST: any) {
+function getAllProperties(_classAST: any) {
     return _classAST?.body
         .filter((item: any) => item.kind == 'propertystatement')
         .map((item: any) => { // because the parser doesnt return correct column
@@ -283,6 +283,10 @@ function getFunctionsLookup(filterExtra) {
     return filterExtra.flatMap((item) =>
         item.body?.children?.filter((child: any) => child.kind == 'function') || [],
     )
+}
+
+export function getName(node: any): string | undefined {
+    return node?.name?.name
 }
 
 export function getRangeFromLoc(start: {line: number, column: number}, end: {line: number, column: number}): vscode.Range {
@@ -357,4 +361,137 @@ export function findLastVariableDeclarationNode(nodes: any[], variableNames?: st
 
 export function hasIntersection(symbol, lineNumber): boolean {
     return symbol.loc.start.line - 1 <= lineNumber && symbol.loc.end.line - 1 >= lineNumber
+}
+
+/**
+ * Finds the innermost method `call` node (e.g. `$this->paginate(...)`, `self::foo(...)`)
+ * that contains the given cursor position, together with the name of the class/trait
+ * that encloses it. Only matches calls whose method name is a plain identifier, so we
+ * never treat array-access `$arr[$k]` or variable calls as a method call.
+ */
+export function getMethodCallAtLine(content: string, line: number, character?: number): {call: any, className: string | undefined} | null {
+    try {
+        const AST = buildASTFromContent(content)
+        const cursor = {line, character: character ?? 0}
+        let best: any = null
+        let bestClassName: string | undefined
+        let bestSize = Infinity
+
+        const containsPosition = (node: any): boolean => {
+            const start = node.loc.start
+            const end = node.loc.end
+
+            return (start.line - 1 < cursor.line
+              || (start.line - 1 === cursor.line && start.column <= cursor.character))
+            && (end.line - 1 > cursor.line
+              || (end.line - 1 === cursor.line && end.column >= cursor.character))
+        }
+
+        const visit = (node: any, className: string | undefined): void => {
+            if (!node || typeof node !== 'object') {
+                return
+            }
+
+            let nextClassName = className
+
+            if (node.kind === 'class' || node.kind === 'trait') {
+                nextClassName = node.name?.name
+            }
+
+            if (node.kind === 'call'
+              && node.what?.offset?.kind === 'identifier'
+              && containsPosition(node)) {
+                const size = node.loc.end.offset - node.loc.start.offset
+
+                if (size < bestSize) {
+                    bestSize = size
+                    best = node
+                    bestClassName = nextClassName
+                }
+            }
+
+            Object.values(node).forEach((value) => visit(value, nextClassName))
+        }
+
+        visit(AST, undefined)
+
+        return best ? {call: best, className: bestClassName} : null
+    } catch (error) {
+        return null
+    }
+}
+
+/**
+ * Resolves the class a method call is invoked on, using the enclosing class name
+ * for instance/`$this` receivers.
+ *  - `$this->foo()` / `self::foo()` / `static::foo()`  → the enclosing class
+ *  - `SomeClass::foo()`                                → the referenced class name
+ *  - `$instance->foo()` (plain variable) or a chained call receiver → undefined
+ */
+export function resolveCallReceiverClass(callNode: any, enclosingClassName?: string): string | undefined {
+    const what = callNode?.what
+
+    if (!what) {
+        return undefined
+    }
+
+    if (what.kind === 'propertylookup') {
+        if (what.what?.kind === 'variable' && what.what.name === 'this') {
+            return enclosingClassName
+        }
+
+        return undefined
+    }
+
+    if (what.kind === 'staticlookup') {
+        const receiver = what.what
+
+        if (receiver?.kind === 'name') {
+            return receiver.name
+        }
+
+        return enclosingClassName
+    }
+
+    return undefined
+}
+
+/**
+ * Extracts the namespace declaration and the alias map (short name → FQCN) from a
+ * file. The alias map only covers class/interface imports (not `use function` or
+ * `use const`). Unaliased imports map by their last name segment.
+ */
+export function parseUseStatements(content: string): {namespace: string | undefined, aliases: Record<string, string>} {
+    try {
+        const AST: any = buildASTFromContent(content)
+        const namespaceNode = AST?.children?.find((item: any) => item.kind === 'namespace')
+        const namespace = namespaceNode?.name?.name
+        const aliases: Record<string, string> = {}
+        const items = namespaceNode?.children ?? AST?.children ?? []
+
+        for (const item of items) {
+            if (item.kind !== 'usegroup' || item.type === 'function' || item.type === 'const') {
+                continue
+            }
+
+            const groupPrefix = item.name ? `${item.name}\\` : ''
+
+            for (const useItem of item.items ?? []) {
+                if (useItem.kind !== 'useitem' || useItem.type) {
+                    continue
+                }
+
+                const full = `${groupPrefix}${useItem.name}`
+                const alias = useItem.alias?.name ?? full.split('\\').pop()
+
+                if (alias) {
+                    aliases[alias] = full
+                }
+            }
+        }
+
+        return {namespace, aliases}
+    } catch (error) {
+        return {namespace: undefined, aliases: {}}
+    }
 }

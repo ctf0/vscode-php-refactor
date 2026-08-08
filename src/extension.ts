@@ -42,6 +42,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         // new
         vscode.commands.registerCommand(`${utils.PACKAGE_CMND_NAME}.add_magic`, async(arg: string) => await _refactor.addMagicMethod(arg)),
         vscode.commands.registerCommand(`${utils.PACKAGE_CMND_NAME}.add_new_property`, async() => await _refactor.addNewProperty()),
+        vscode.commands.registerCommand(`${utils.PACKAGE_CMND_NAME}.inject_named_arguments`, async(className: string | undefined, methodName: string) => await _refactor.injectNamedArguments(className, methodName)),
         vscode.commands.registerCommand(`${utils.PACKAGE_CMND_NAME}.copy_array_key`, async(key: string) => {
             await vscode.env.clipboard.writeText(key)
             utils.showMessage(`"${key}" copied`)

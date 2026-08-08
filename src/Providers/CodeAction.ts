@@ -37,6 +37,7 @@ export default class CodeAction implements vscode.CodeActionProvider {
             for (const methodName of symbolsAndReferences.filterMagicSymbols(_classSymbols, utils.getConfig('magicMethods') || [])) {
                 commands.push({
                     title     : `Add ${methodName}`,
+                    type      : vscode.CodeActionKind.Refactor,
                     command   : `${utils.PACKAGE_CMND_NAME}.add_magic`,
                     arguments : [methodName],
                 })
@@ -54,17 +55,37 @@ export default class CodeAction implements vscode.CodeActionProvider {
                 })
             }
 
+            // inject_named_arguments
+            const callInfo = parser.getMethodCallAtLine(content, range.start.line, range.start.character)
+
+            if (callInfo) {
+                const methodName = callInfo.call.what?.offset?.name
+
+                if (methodName) {
+                    commands.push({
+                        title     : `Inject Named Arguments (${methodName})`,
+                        command   : `${utils.PACKAGE_CMND_NAME}.inject_named_arguments`,
+                        type      : vscode.CodeActionKind.RefactorRewrite,
+                        arguments : [
+                            parser.resolveCallReceiverClass(callInfo.call, callInfo.className),
+                            methodName,
+                        ],
+                    })
+                }
+            }
+
             // addNewProperty
             if (parser.canAddNewPropertyAtLine(content, range.start.line)) {
                 commands.push({
                     title   : 'Add New Property',
+                    type    : vscode.CodeActionKind.Refactor,
                     command : `${utils.PACKAGE_CMND_NAME}.add_new_property`,
                 })
             }
 
             const _methodsOrFunctions = symbolsAndReferences.extractMethodOrFunctionsSymbols(content)
 
-            if (_methodsOrFunctions && !symbolsAndReferences.hasStartOrEndIntersection(selections, _methodsOrFunctions)) {
+            if (_methodsOrFunctions && !symbolsAndReferences.findIntersectingSymbol(selections, _methodsOrFunctions)) {
                 const activeSelection = selections[0].active
 
                 // add_missing_function
@@ -73,7 +94,7 @@ export default class CodeAction implements vscode.CodeActionProvider {
                 if (methodWordRange) {
                     const methodName = document.getText(methodWordRange)
 
-                    if (!_methodsOrFunctions.some((item) => item.name.name == methodName)) {
+                    if (!_methodsOrFunctions.some((item) => parser.getName(item) == methodName)) {
                         commands.push(
                             {
                                 command : `${utils.PACKAGE_CMND_NAME}.add_missing_function`,
@@ -91,7 +112,7 @@ export default class CodeAction implements vscode.CodeActionProvider {
                     const propName = document.getText(propWordRange)
                     const _props = symbolsAndReferences.extractPropSymbols(_classSymbols)
 
-                    if (!_props || !_props.some((item) => item.name.name == propName)) {
+                    if (!_props || !_props.some((item) => parser.getName(item) == propName)) {
                         commands.push(
                             {
                                 command : `${utils.PACKAGE_CMND_NAME}.add_missing_prop`,

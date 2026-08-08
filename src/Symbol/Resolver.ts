@@ -1,6 +1,7 @@
 import * as vscode from 'vscode'
 import type {ClassAST} from '../types'
 import * as utils from '../utils'
+import * as MethodLookup from './MethodLookup'
 import * as parser from './Parser'
 
 export default class Resolver {
@@ -96,6 +97,176 @@ export default class Resolver {
             },
             prefix : '',
         }
+    }
+
+    /* Named Arguments --------------------------------------------------------- */
+    async injectNamedArguments(className: string | undefined, methodName: string): Promise<boolean> {
+        const editor = this.getEditor()
+        const {selection, document} = editor
+
+        const callNode = parser.getMethodCallAtLine(document.getText(), selection.active.line, selection.active.character)
+
+        if (!callNode) {
+            utils.showMessage('place the cursor inside a method call', true)
+
+            return false
+        }
+
+        const caller = parser.parseUseStatements(document.getText())
+        const method = await this.resolveMethodDefinition(
+            className,
+            methodName,
+            document.fileName,
+            caller,
+        )
+
+        if (!method) {
+            utils.showMessage(`could not find the definition of \`${methodName}()\``, true)
+
+            return false
+        }
+
+        const snippet = this.buildNamedArgsSnippet(method.arguments || [], callNode.call.arguments || [], document)
+
+        if (!snippet) {
+            utils.showMessage(`\`${methodName}()\` has no parameters to inject`, true)
+
+            return false
+        }
+
+        const insertPosition = new vscode.Position(
+            callNode.call.what.loc.end.line - 1,
+            callNode.call.what.loc.end.column,
+        )
+        const insertRange = parser.getRangeFromLoc(callNode.call.what.loc.end, callNode.call.loc.end)
+
+        editor.selection = new vscode.Selection(insertPosition, insertPosition)
+
+        return editor.insertSnippet(
+            new vscode.SnippetString(snippet),
+            insertRange,
+        )
+    }
+
+    private async resolveMethodDefinition(
+        className: string | undefined,
+        methodName: string,
+        currentFile: string,
+        caller: {namespace: string | undefined, aliases: Record<string, string>},
+    ): Promise<any | null> {
+        const result = await MethodLookup.searchForMethod(
+            className,
+            methodName,
+            currentFile,
+            caller,
+        )
+
+        return result?.method ?? null
+    }
+
+    private buildNamedArgsSnippet(arguments_: any[], callArguments: any[], document: vscode.TextDocument): string {
+        if (!arguments_.length) {
+            return ''
+        }
+
+        const paramNames = arguments_.map((arg) => arg.name?.name).filter(Boolean)
+
+        if (paramNames.length !== arguments_.length) {
+            return ''
+        }
+
+        // Keep the existing call arguments in their current order, then append any
+        // method params that are not already present (matched by name).
+        const existing = callArguments.map((arg, index) => {
+            const name = arg.kind === 'namedargument' ? arg.name : paramNames[index]
+            const valueNode = arg.kind === 'namedargument' ? arg.value : arg
+            const valueText = valueNode?.loc
+                ? document.getText(parser.getRangeFromLoc(valueNode.loc.start, valueNode.loc.end))
+                : undefined
+
+            return {name, valueText}
+        }).filter((entry) => entry.name)
+
+        const present = new Set(existing.map((entry) => entry.name))
+        const missing = arguments_
+            .filter((arg) => !present.has(arg.name?.name))
+            .map((arg) => ({name: arg.name?.name, valueText: this.renderDefaultValue(arg.value)}))
+
+        const entries = [...existing, ...missing]
+        const tabIndex = 1
+        const lines = entries.map((entry, index) => {
+            const value = entry.valueText
+            // `$` must be escaped inside snippet placeholders, otherwise VS Code
+            // treats `$name` as a snippet variable reference and drops it.
+            const escaped = value?.replace(/\$/g, '\\$')
+            const placeholder = escaped !== undefined
+                ? `\$\{${tabIndex + index}:${escaped}\}`
+                : `\$${tabIndex + index}`
+
+            return `${this.DEFAULT_INDENT}${entry.name}: ${placeholder},`
+        })
+
+        return `(\n${lines.join('\n')}\n)`
+    }
+
+    /**
+     * Renders a parameter default value AST node back to PHP source text, so the
+     * injected placeholder is pre-filled with the declared default. Returns
+     * undefined when the node has no renderable default.
+     */
+    private renderDefaultValue(node: any): string | undefined {
+        if (!node) {
+            return undefined
+        }
+
+        switch (node.kind) {
+            case 'nullkeyword':
+                return 'null'
+            case 'boolean':
+                return node.value ? 'true' : 'false'
+            case 'number':
+                return node.value
+            case 'string':
+                return node.raw ?? `'${node.value}'`
+            case 'unary':
+                return `${node.type}${this.renderDefaultValue(node.what) ?? ''}`
+            case 'array':
+                return this.renderArray(node)
+            case 'identifier':
+                return node.name
+            case 'name':
+                return node.name
+            case 'constref':
+                return node.name?.name
+            default:
+                return node.raw
+        }
+    }
+
+    private renderArray(node: any): string {
+        const items = (node.items ?? [])
+            .map((entry: any) => {
+                const value = this.renderDefaultValue(entry.value)
+
+                if (value === undefined) {
+                    return null
+                }
+
+                if (entry.key) {
+                    const key = this.renderDefaultValue(entry.key)
+
+                    return key !== undefined ? `${key} => ${value}` : value
+                }
+
+                if (entry.unpack) {
+                    return `...${value}`
+                }
+
+                return value
+            })
+            .filter((item: any): item is string => item !== null)
+
+        return `[${items.join(', ')}]`
     }
 
     private resolveClassScopeIndentation(position: {addPrefixLine: boolean, addSuffixLine: boolean, column: number}): {prefix: string, suffix: string} {
@@ -236,7 +407,7 @@ export default class Resolver {
 
         if (methodsOrFunctions
             .filter((item) => item.kind !== 'closure')
-            .some((item) => item.name.name == methodName)) {
+            .some((item) => parser.getName(item) == methodName)) {
             return utils.showMessage('method already exists')
         }
 
@@ -286,7 +457,7 @@ export default class Resolver {
         }
 
         const methodParameters = dependencies.map((name) => {
-            const argument = functionBody.arguments?.find((item) => item.name.name === name)
+            const argument = functionBody.arguments?.find((item) => parser.getName(item) === name)
 
             if (!argument) {
                 return `$${name}`
@@ -375,7 +546,7 @@ export default class Resolver {
             const line = document.lineAt(functionLike.loc.start.line - 1)
             const indentation = line.text.substring(0, line.firstNonWhitespaceCharacterIndex)
             const bodyIndentation = `${indentation}${this.DEFAULT_INDENT}`
-            const parameters = new Set(functionLike.arguments.map((argument) => argument.name.name))
+            const parameters = new Set(functionLike.arguments.map((argument) => parser.getName(argument)))
             const superglobals = new Set(['this', 'GLOBALS', '_SERVER', '_GET', '_POST', '_FILES', '_COOKIE', '_SESSION', '_REQUEST', '_ENV', 'http_response_header', 'argc', 'argv'])
             const dependencies = new Set<string>()
             const expressionLines = expression.split('\n')
@@ -967,7 +1138,7 @@ export default class Resolver {
             let replacementText: string
 
             if (selectedMethod) {
-                methodName = selectedMethod.name.name
+                methodName = parser.getName(selectedMethod) || 'extractedMethod'
                 const isStatic = selectedMethod.isStatic === true
                 const methodParameters = this.generateMethodCallParameters(selectedMethod.arguments || [])
 

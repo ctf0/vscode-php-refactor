@@ -11,7 +11,7 @@ export function extractClassSymbols(content: string): any[] | undefined {
 export function filterMagicSymbols(_classSymbols: any[] | undefined, methodNames: string[]): string[] {
     const current = _classSymbols
         ?.filter((symbol) => symbol.kind === 'method')
-        .map((symbol) => symbol.name.name) || []
+        .map((symbol) => parser.getName(symbol)) || []
 
     return methodNames.filter((name) => current.indexOf(name) === -1)
 }
@@ -22,7 +22,7 @@ export function extractPropSymbols(_classSymbols: any[] | undefined): any[] | un
         .flatMap((item) => item.properties)
 }
 
-export function hasStartOrEndIntersection(selections, symbols: any[]): any {
+export function findIntersectingSymbol(selections, symbols: any[]): any {
     return symbols.find((item) => {
         if (selections.find((selection) => item.loc.start.line - 1 === selection.start.line
           || item.loc.end.line - 1 === selection.end.line)) {
